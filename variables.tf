@@ -70,9 +70,14 @@ variable "lambda_source_dir" {
 }
 
 variable "requirements_file" {
-  description = "Path to the requirements.txt file for Python dependencies"
+  description = <<-EOF
+    Path to requirements.txt file for Python dependencies.
+    Dependencies will be installed with platform-specific wheels for the target architecture.
+    If not specified, the module will automatically look for requirements.txt in var.lambda_source_dir.
+    Set to null to explicitly skip dependency installation.
+  EOF
   type        = string
-  default     = ""
+  default     = null
 }
 
 variable "cloudwatch_log_retention_days" {

@@ -7,14 +7,16 @@ Designed to meet ISO27001 compliance requirements for error rate monitoring.
 
 ## Features
 
-- Multi-architecture support (x86_64, arm64)
+- Multi-architecture support (x86_64, arm64) with automatic platform-specific dependency packaging
 - Multi-Python version support (3.9, 3.10, 3.11, 3.12, 3.13)
+- Intelligent dependency packaging with manylinux wheels for target architecture
 - CloudWatch Logs with configurable retention and encryption
 - Flexible IAM permissions (attach custom policies)
 - S3-based deployment with secure bucket management
 - Error monitoring and alerting with SNS email notifications
 - Configurable alert strategies (immediate or threshold-based)
 - Throttle monitoring and alerts
+- Automatic change detection (re-packages only when code or dependencies change)
 
 ## Usage
 
@@ -85,6 +87,36 @@ resource "aws_iam_policy" "lambda_custom_permissions" {
 }
 ```
 
+## Dependencies and Packaging
+
+The module uses an intelligent packaging system that automatically handles Python dependencies:
+
+**With Dependencies:**
+```hcl
+module "lambda" {
+  source  = "infrahouse/lambda-monitored/aws"
+  version = "0.1.0"
+
+  function_name      = "my-function"
+  lambda_source_dir  = "${path.module}/lambda"
+  requirements_file  = "${path.module}/lambda/requirements.txt"  # Optional
+  architecture       = "arm64"  # Dependencies installed for ARM64
+  python_version     = "python3.12"
+  alarm_emails       = ["team@example.com"]
+}
+```
+
+**How it works:**
+1. The module uses platform-specific manylinux wheels (`manylinux2014_x86_64` or `manylinux2014_aarch64`)
+2. Dependencies are installed with `--only-binary=:all:` to ensure AWS Lambda compatibility
+3. Only re-packages when source code, dependencies, architecture, or Python version changes
+4. Automatically cleans up Python cache files (`__pycache__`, `.pyc`)
+
+**Requirements:**
+- Python 3 must be installed locally (used by packaging script)
+- The `pip` module must be available
+- For cross-architecture builds, ensure pip can download the correct platform wheels
+
 ## Notes
 
 ### Email Subscription Confirmation
@@ -131,6 +163,7 @@ Apache 2.0
 | alarm_emails | List of email addresses for alarm notifications | `list(string)` | n/a | yes |
 | python_version | Python runtime version | `string` | `"python3.12"` | no |
 | architecture | Instruction set architecture (x86_64 or arm64) | `string` | `"x86_64"` | no |
+| requirements_file | Path to requirements.txt for Python dependencies | `string` | `""` | no |
 | handler | Lambda function handler | `string` | `"main.lambda_handler"` | no |
 | timeout | Lambda function timeout in seconds | `number` | `60` | no |
 | memory_size | Lambda function memory size in MB | `number` | `128` | no |

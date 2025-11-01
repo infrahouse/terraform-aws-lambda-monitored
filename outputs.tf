@@ -48,6 +48,11 @@ output "s3_bucket_arn" {
   value       = module.lambda_bucket.bucket_arn
 }
 
+output "requirements_file_used" {
+  description = "Path to the requirements.txt file used for packaging (or 'none' if no dependencies)"
+  value       = local.requirements_file
+}
+
 # Monitoring outputs
 
 output "sns_topic_arn" {
