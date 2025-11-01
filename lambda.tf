@@ -105,7 +105,7 @@ resource "aws_lambda_function" "this" {
 
   tags = merge(
     {
-      module_version    = local.module_version
+      module_version = local.module_version
     },
     local.tags
   )

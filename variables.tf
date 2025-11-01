@@ -83,8 +83,8 @@ variable "cloudwatch_log_retention_days" {
   validation {
     condition = contains(
       [
-      0, 1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1096, 1827, 2192, 2557, 2922, 3288, 3653
-    ],
+        0, 1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1096, 1827, 2192, 2557, 2922, 3288, 3653
+      ],
       var.cloudwatch_log_retention_days
     )
     error_message = "Log retention must be a valid CloudWatch Logs retention period"
@@ -101,6 +101,86 @@ variable "additional_iam_policy_arns" {
   description = "List of IAM policy ARNs to attach to the Lambda execution role"
   type        = list(string)
   default     = []
+}
+
+# Monitoring and Alerting Variables
+
+variable "alarm_emails" {
+  description = "List of email addresses to receive alarm notifications. AWS will send confirmation emails that must be accepted. At least one email is required."
+  type        = list(string)
+
+  validation {
+    condition     = length(var.alarm_emails) > 0
+    error_message = "At least one email address must be provided for alarm notifications"
+  }
+}
+
+variable "alarm_topic_arns" {
+  description = "List of existing SNS topic ARNs to send alarms to (for advanced integrations like PagerDuty, Slack, etc.)"
+  type        = list(string)
+  default     = []
+}
+
+variable "sns_topic_name" {
+  description = "Name for the SNS topic. If not provided, defaults to '<function_name>-alarms'"
+  type        = string
+  default     = null
+}
+
+variable "enable_error_alarms" {
+  description = "Enable CloudWatch alarms for Lambda errors"
+  type        = bool
+  default     = true
+}
+
+variable "alert_strategy" {
+  description = "Alert strategy: 'immediate' (alert on any error) or 'threshold' (alert when error rate exceeds threshold)"
+  type        = string
+  default     = "immediate"
+
+  validation {
+    condition     = contains(["immediate", "threshold"], var.alert_strategy)
+    error_message = "Alert strategy must be either 'immediate' or 'threshold'"
+  }
+}
+
+variable "error_rate_threshold" {
+  description = "Error rate percentage threshold for 'threshold' alert strategy (0-100)"
+  type        = number
+  default     = 5.0
+
+  validation {
+    condition     = var.error_rate_threshold >= 0 && var.error_rate_threshold <= 100
+    error_message = "Error rate threshold must be between 0 and 100"
+  }
+}
+
+variable "error_rate_evaluation_periods" {
+  description = "Number of evaluation periods for error rate alarm"
+  type        = number
+  default     = 2
+
+  validation {
+    condition     = var.error_rate_evaluation_periods >= 1
+    error_message = "Evaluation periods must be at least 1"
+  }
+}
+
+variable "error_rate_datapoints_to_alarm" {
+  description = "Number of datapoints that must breach threshold to trigger alarm"
+  type        = number
+  default     = 2
+
+  validation {
+    condition     = var.error_rate_datapoints_to_alarm >= 1
+    error_message = "Datapoints to alarm must be at least 1"
+  }
+}
+
+variable "enable_throttle_alarms" {
+  description = "Enable CloudWatch alarms for Lambda throttling"
+  type        = bool
+  default     = true
 }
 
 variable "tags" {

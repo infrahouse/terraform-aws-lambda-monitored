@@ -47,3 +47,36 @@ output "s3_bucket_arn" {
   description = "ARN of the S3 bucket storing Lambda packages"
   value       = module.lambda_bucket.bucket_arn
 }
+
+# Monitoring outputs
+
+output "sns_topic_arn" {
+  description = "ARN of the SNS topic for alarm notifications"
+  value       = aws_sns_topic.alarms.arn
+}
+
+output "sns_topic_name" {
+  description = "Name of the SNS topic for alarm notifications"
+  value       = aws_sns_topic.alarms.name
+}
+
+output "pending_email_confirmations" {
+  description = "List of email addresses pending SNS subscription confirmation"
+  value       = var.alarm_emails
+}
+
+output "error_alarm_arn" {
+  description = "ARN of the error CloudWatch alarm (if enabled)"
+  value = var.enable_error_alarms && var.alert_strategy == "immediate" ? try(
+    aws_cloudwatch_metric_alarm.errors_immediate[0].arn, null
+    ) : var.enable_error_alarms && var.alert_strategy == "threshold" ? try(
+    aws_cloudwatch_metric_alarm.errors_threshold[0].arn, null
+  ) : null
+}
+
+output "throttle_alarm_arn" {
+  description = "ARN of the throttle CloudWatch alarm (if enabled)"
+  value = var.enable_throttle_alarms ? try(
+    aws_cloudwatch_metric_alarm.throttles[0].arn, null
+  ) : null
+}

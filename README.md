@@ -12,7 +12,9 @@ Designed to meet ISO27001 compliance requirements for error rate monitoring.
 - CloudWatch Logs with configurable retention and encryption
 - Flexible IAM permissions (attach custom policies)
 - S3-based deployment with secure bucket management
-- Error monitoring and alerting (coming in Phase 2)
+- Error monitoring and alerting with SNS email notifications
+- Configurable alert strategies (immediate or threshold-based)
+- Throttle monitoring and alerts
 
 ## Usage
 
@@ -43,6 +45,17 @@ module "lambda" {
     aws_iam_policy.lambda_custom_permissions.arn
   ]
 
+  # Required: Email addresses for alarm notifications
+  alarm_emails = ["team@example.com", "oncall@example.com"]
+
+  # Optional: Alert strategy
+  alert_strategy = "immediate"  # or "threshold"
+
+  # Optional: For threshold strategy
+  error_rate_threshold           = 5.0  # 5% error rate
+  error_rate_evaluation_periods  = 2
+  error_rate_datapoints_to_alarm = 2
+
   # Optional: CloudWatch Logs retention
   cloudwatch_log_retention_days = 365
 
@@ -72,6 +85,29 @@ resource "aws_iam_policy" "lambda_custom_permissions" {
 }
 ```
 
+## Notes
+
+### Email Subscription Confirmation
+
+When you specify `alarm_emails`, AWS will send a confirmation email to each address.
+Recipients **must click the confirmation link** to receive alerts. The Terraform apply
+will complete successfully, but **notifications won't be sent until subscriptions are confirmed**.
+
+**Important:** If you destroy and recreate the module, new confirmation emails will be sent
+even to previously confirmed addresses.
+
+### S3 Bucket Security
+
+The module uses the InfraHouse S3 bucket module which automatically configures:
+- Server-side encryption
+- Versioning
+- Public access blocking
+- Secure bucket policies
+
+## License
+
+Apache 2.0
+
 ## Requirements
 
 | Name | Version |
@@ -92,6 +128,7 @@ resource "aws_iam_policy" "lambda_custom_permissions" {
 |------|-------------|------|---------|:--------:|
 | function_name | Name of the Lambda function | `string` | n/a | yes |
 | lambda_source_dir | Path to the directory containing Lambda function source code | `string` | n/a | yes |
+| alarm_emails | List of email addresses for alarm notifications | `list(string)` | n/a | yes |
 | python_version | Python runtime version | `string` | `"python3.12"` | no |
 | architecture | Instruction set architecture (x86_64 or arm64) | `string` | `"x86_64"` | no |
 | handler | Lambda function handler | `string` | `"main.lambda_handler"` | no |
@@ -101,6 +138,14 @@ resource "aws_iam_policy" "lambda_custom_permissions" {
 | environment_variables | Map of environment variables | `map(string)` | `{}` | no |
 | additional_iam_policy_arns | List of IAM policy ARNs to attach | `list(string)` | `[]` | no |
 | cloudwatch_log_retention_days | Number of days to retain CloudWatch logs | `number` | `365` | no |
+| alarm_topic_arns | List of existing SNS topic ARNs for alarms | `list(string)` | `[]` | no |
+| sns_topic_name | Name for the SNS topic | `string` | `null` | no |
+| enable_error_alarms | Enable CloudWatch alarms for Lambda errors | `bool` | `true` | no |
+| alert_strategy | Alert strategy: 'immediate' or 'threshold' | `string` | `"immediate"` | no |
+| error_rate_threshold | Error rate percentage threshold (0-100) | `number` | `5.0` | no |
+| error_rate_evaluation_periods | Number of evaluation periods for error rate alarm | `number` | `2` | no |
+| error_rate_datapoints_to_alarm | Number of datapoints that must breach to trigger alarm | `number` | `2` | no |
+| enable_throttle_alarms | Enable CloudWatch alarms for Lambda throttling | `bool` | `true` | no |
 | tags | Map of tags to assign to resources | `map(string)` | `{}` | no |
 
 ## Outputs
@@ -114,26 +159,10 @@ resource "aws_iam_policy" "lambda_custom_permissions" {
 | lambda_role_name | Name of the IAM role used by the Lambda function |
 | cloudwatch_log_group_name | Name of the CloudWatch Log Group |
 | cloudwatch_log_group_arn | ARN of the CloudWatch Log Group |
-
-## Notes
-
-### Email Subscription Confirmation (Phase 2)
-
-When Phase 2 monitoring features are released, if you specify `alarm_emails`, AWS will send a confirmation
-email to each address. Recipients must click the confirmation link to receive alerts.
-The Terraform apply will complete successfully, but notifications won't be sent until subscriptions are confirmed.
-
-> Note: If you destroy and recreate the module, new confirmation emails will be sent even
-> to previously confirmed addresses.
-
-### S3 Bucket Security
-
-The module uses the InfraHouse S3 bucket module which automatically configures:
-- Server-side encryption
-- Versioning
-- Public access blocking
-- Secure bucket policies
-
-## License
-
-Apache 2.0
+| s3_bucket_name | Name of the S3 bucket storing Lambda packages |
+| s3_bucket_arn | ARN of the S3 bucket storing Lambda packages |
+| sns_topic_arn | ARN of the SNS topic for alarm notifications |
+| sns_topic_name | Name of the SNS topic for alarm notifications |
+| pending_email_confirmations | List of emails pending SNS subscription confirmation |
+| error_alarm_arn | ARN of the error CloudWatch alarm (if enabled) |
+| throttle_alarm_arn | ARN of the throttle CloudWatch alarm (if enabled) |
