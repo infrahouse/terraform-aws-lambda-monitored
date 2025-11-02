@@ -34,6 +34,8 @@ def create_terraform_config(
     alert_strategy: str = "immediate",
     aws_region: str = "us-west-2",
     role_arn: str = None,
+    subnet_ids: list = None,
+    security_group_ids: list = None,
 ):
     """
     Create Terraform configuration files for testing the module.
@@ -51,6 +53,8 @@ def create_terraform_config(
     :param str alert_strategy: Alert strategy (immediate or threshold)
     :param str aws_region: AWS region for deployment
     :param str role_arn: IAM role ARN to assume for testing (optional)
+    :param list subnet_ids: List of subnet IDs for VPC configuration (optional)
+    :param list security_group_ids: List of security group IDs for VPC configuration (optional)
     """
     LOG.info("Creating Terraform root module in %s", module_dir)
 
@@ -81,19 +85,37 @@ def create_terraform_config(
     )
     (module_dir / "terraform.tf").write_text(terraform_tf)
 
-    # Create variables.tf
+    # Create variables.tf with optional VPC variables
+    vpc_variables = ""
+    if subnet_ids and security_group_ids is None:
+        vpc_variables = dedent(
+            """
+            variable "subnet_ids" {
+              description = "List of subnet IDs for Lambda VPC configuration"
+              type        = list(string)
+            }
+
+            variable "function_name" {
+              description = "Lambda function name"
+              type        = string
+            }
+            """
+        )
+
     variables_tf = dedent(
-        """
-        variable "region" {
+        f"""
+        variable "region" {{
           description = "AWS region"
           type        = string
-        }
+        }}
 
-        variable "role_arn" {
+        variable "role_arn" {{
           description = "IAM role ARN to assume"
           type        = string
           default     = null
-        }
+        }}
+
+        {vpc_variables}
         """
     )
     (module_dir / "variables.tf").write_text(variables_tf)
@@ -119,25 +141,72 @@ def create_terraform_config(
     )
     (module_dir / "provider.tf").write_text(provider_tf)
 
-    # Create main.tf
+    # Create main.tf with optional VPC configuration
+    import json
+
+    # Create security group resource if VPC is configured
+    sg_resource = ""
+    vpc_config = ""
+    if subnet_ids and security_group_ids is None:
+        # Create security group in Terraform when VPC is configured
+        sg_resource = dedent(
+            """
+            # Get VPC ID from subnet
+            data "aws_subnet" "selected" {
+              id = var.subnet_ids[0]
+            }
+
+            # Security group for Lambda
+            resource "aws_security_group" "lambda" {
+              name_prefix = "${var.function_name}-"
+              description = "Security group for ${var.function_name} Lambda function"
+              vpc_id      = data.aws_subnet.selected.vpc_id
+
+              egress {
+                from_port   = 0
+                to_port     = 0
+                protocol    = "-1"
+                cidr_blocks = ["0.0.0.0/0"]
+              }
+
+              tags = {
+                Name       = "${var.function_name}-sg"
+                created_by = "terraform-aws-lambda-monitored-test"
+              }
+            }
+            """
+        )
+        vpc_config = """
+          # VPC Configuration
+          lambda_subnet_ids         = var.subnet_ids
+          lambda_security_group_ids = [aws_security_group.lambda.id]
+        """
+    elif subnet_ids and security_group_ids:
+        vpc_config = f"""
+          # VPC Configuration
+          lambda_subnet_ids         = {json.dumps(subnet_ids)}
+          lambda_security_group_ids = {json.dumps(security_group_ids)}
+        """
+
     main_tf = dedent(
         f'''
+        {sg_resource}
         module "lambda_monitored" {{
           source = "./.."  # Points to the root module
-        
+
           function_name     = "{function_name}"
           lambda_source_dir = "{str(lambda_source_dir).replace('\\', '/')}"
           python_version    = "{python_version}"
           architecture      = "{architecture}"
           alert_strategy    = "{alert_strategy}"
-        
+
           alarm_emails = ["{alarm_email}"]
-        
+
           # Threshold-specific settings
           error_rate_threshold            = 5.0
           error_rate_evaluation_periods   = 2
           error_rate_datapoints_to_alarm  = 2
-        
+          {vpc_config}
           tags = {{
             Environment = "test"
             ManagedBy   = "terraform"
@@ -153,29 +222,41 @@ def create_terraform_config(
         output "lambda_function_arn" {
           value = module.lambda_monitored.lambda_function_arn
         }
-        
+
         output "lambda_function_name" {
           value = module.lambda_monitored.lambda_function_name
         }
-        
+
+        output "lambda_role_arn" {
+          value = module.lambda_monitored.lambda_role_arn
+        }
+
         output "cloudwatch_log_group_name" {
           value = module.lambda_monitored.cloudwatch_log_group_name
         }
-        
+
         output "sns_topic_arn" {
           value = module.lambda_monitored.sns_topic_arn
         }
-        
+
         output "error_alarm_arn" {
           value = module.lambda_monitored.error_alarm_arn
         }
-        
+
         output "s3_bucket_name" {
           value = module.lambda_monitored.s3_bucket_name
         }
-        
+
         output "requirements_file_used" {
           value = module.lambda_monitored.requirements_file_used
+        }
+
+        output "vpc_config_subnet_ids" {
+          value = module.lambda_monitored.vpc_config_subnet_ids
+        }
+
+        output "vpc_config_security_group_ids" {
+          value = module.lambda_monitored.vpc_config_security_group_ids
         }
         """
     )
@@ -185,6 +266,9 @@ def create_terraform_config(
     tfvars_content = f'region = "{aws_region}"\n'
     if role_arn:
         tfvars_content += f'role_arn = "{role_arn}"\n'
+    if subnet_ids and security_group_ids is None:
+        tfvars_content += f'subnet_ids = {json.dumps(subnet_ids)}\n'
+        tfvars_content += f'function_name = "{function_name}"\n'
     (module_dir / "terraform.tfvars").write_text(tfvars_content)
 
 
