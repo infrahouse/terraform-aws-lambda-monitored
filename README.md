@@ -18,6 +18,30 @@ Designed to meet ISO27001 compliance requirements for error rate monitoring.
 - Throttle monitoring and alerts
 - Automatic change detection (re-packages only when code or dependencies change)
 
+## Prerequisites
+
+The module's packaging script requires the following tools to be installed on the system where Terraform runs:
+
+- **Python 3** - For installing dependencies
+  - Ubuntu/Debian: `sudo apt-get install python3 python3-pip`
+  - macOS: `brew install python3`
+  - Amazon Linux: `sudo yum install python3 python3-pip`
+  - Windows: [Download from python.org](https://www.python.org/downloads/)
+
+- **pip3** - For managing Python packages
+  - Ubuntu/Debian: `sudo apt-get install python3-pip`
+  - macOS: `python3 -m ensurepip`
+  - Amazon Linux: `sudo yum install python3-pip`
+  - Windows: `python -m ensurepip`
+
+- **jq** - For parsing JSON responses
+  - Ubuntu/Debian: `sudo apt-get install jq`
+  - macOS: `brew install jq`
+  - Amazon Linux: `sudo yum install jq`
+  - Windows: [Download from stedolan.github.io/jq](https://stedolan.github.io/jq/download/)
+
+The packaging and deployment scripts will check for these dependencies and provide installation instructions if any are missing.
+
 ## Usage
 
 ```hcl
@@ -135,6 +159,92 @@ The module uses the InfraHouse S3 bucket module which automatically configures:
 - Versioning
 - Public access blocking
 - Secure bucket policies
+
+## Development and Testing
+
+This module includes a comprehensive test suite using pytest. The Makefile provides convenient targets for running tests.
+
+### Running Tests
+
+The module provides several test targets:
+
+```bash
+# Run all tests
+make test
+
+# Run specific test suites
+make test-simple          # Test simple Lambda deployment
+make test-deps            # Test Lambda with dependencies
+make test-monitoring      # Test error monitoring (keeps resources)
+make test-sns             # Test SNS integration
+
+# Run architecture-specific tests
+make test-x86             # Test x86_64 architecture only
+make test-arm             # Test arm64 architecture only
+```
+
+### Filtering Tests
+
+You can filter tests using the `TEST_SELECTOR` variable:
+
+```bash
+# Run specific test
+make test-simple TEST_SELECTOR="test_lambda_deployment"
+
+# Run tests for specific provider version
+make test-simple TEST_SELECTOR="provider-6.x"
+
+# Run tests for specific Python version
+make test-deps TEST_SELECTOR="py3.13"
+
+# Combine filters (AND logic)
+make test-simple TEST_SELECTOR="provider-6.x and py3.12"
+```
+
+### Customizing Test Configuration
+
+Override test configuration variables:
+
+```bash
+# Use different AWS region
+make test-simple TEST_REGION="us-east-1"
+
+# Use different IAM role
+make test-simple TEST_ROLE="arn:aws:iam::123456789:role/my-test-role"
+
+# Keep resources after test (for inspection/debugging)
+make test-simple KEEP_AFTER=1
+
+# Don't keep resources (destroy after test)
+make test-monitoring KEEP_AFTER=
+
+# Combine multiple overrides
+make test-simple \
+  TEST_SELECTOR="test_lambda_deployment" \
+  TEST_REGION="eu-west-1" \
+  TEST_ROLE="arn:aws:iam::123456789:role/my-role" \
+  KEEP_AFTER=1
+```
+
+### Default Test Configuration
+
+The following defaults are used when variables are not specified:
+
+- `TEST_REGION`: `us-west-2`
+- `TEST_ROLE`: `arn:aws:iam::303467602807:role/lambda-monitored-tester`
+- `TEST_SELECTOR`: `test_` (runs all tests)
+- `KEEP_AFTER`: empty (destroys resources after test)
+
+**Note:** The `test-monitoring` target keeps resources by default for alarm observation.
+
+### Other Make Targets
+
+```bash
+make bootstrap            # Install development dependencies
+make lint                 # Check code style
+make format              # Format Terraform and Python files
+make clean               # Clean temporary files and test data
+```
 
 ## License
 

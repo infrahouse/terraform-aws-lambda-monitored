@@ -13,4 +13,11 @@ locals {
   requirements_file = var.requirements_file != null ? var.requirements_file : (
     fileexists(local.requirements_txt_path) ? local.requirements_txt_path : "none"
   )
+
+  # Calculate hash of all source files for change detection
+  # This avoids circular dependency with archive_file
+  lambda_source_files = fileset(var.lambda_source_dir, "**/*.py")
+  source_files_hash = md5(join("", [
+    for f in local.lambda_source_files : filemd5("${var.lambda_source_dir}/${f}")
+  ]))
 }

@@ -1,0 +1,3 @@
+# Test dependencies for terraform-aws-lambda-monitored
+pytest-infrahouse ~= 0.20
+infrahouse-core ~= 0.17

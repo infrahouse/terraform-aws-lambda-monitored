@@ -41,6 +41,13 @@ env/
 ENV/
 .venv
 
+# Pytest
+.pytest_cache/
+pytest-*.log
+
+# Test data directory (Terraform state for tests)
+test_data/
+
 # IDE
 .idea/
 .vscode/
