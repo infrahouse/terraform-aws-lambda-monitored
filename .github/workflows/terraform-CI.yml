@@ -35,7 +35,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v5
         with:
           role-to-assume: ${{ env.ROLE_ARN }}
-          role-session-name: "${{ github.repository_owner }}-${{ github.event.repository.name }}-${{ github.workflow }}-${{ github.run_id }}"
+          role-session-name: "${{ github.event.repository.name }}-${{ github.workflow }}-${{ github.run_id }}"
           aws-region: "us-west-1"
           role-duration-seconds: 28800 # eight hours
 
