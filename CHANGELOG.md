@@ -16,11 +16,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - VPC-related outputs: `vpc_config_subnet_ids`, `vpc_config_security_group_ids`
   - Comprehensive VPC documentation in README with use cases and considerations
 
-- **CI/CD Workflow**: GitHub Actions workflow for automated testing on pull requests
-  - Self-hosted runner configuration
-  - AWS OIDC authentication with role assumption
-  - Automated Python environment setup, linting, and testing
-  - Follows InfraHouse CI pattern for consistency across modules
+- **CI/CD Workflows**: GitHub Actions workflows for automated testing and deployment
+  - **terraform-CI.yml**: Automated testing on pull requests
+    - Self-hosted runner configuration
+    - AWS OIDC authentication with role assumption
+    - Automated Python environment setup, linting, and testing
+  - **terraform-CD.yml**: Automated module publishing on tag push
+    - Publishes to InfraHouse Terraform Registry
+    - Production environment protection
+  - Follows InfraHouse CI/CD patterns for consistency across modules
 
 ## [0.1.0] - 2025-11-02
 
