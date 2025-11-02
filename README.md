@@ -141,6 +141,56 @@ module "lambda" {
 - The `pip` module must be available
 - For cross-architecture builds, ensure pip can download the correct platform wheels
 
+## VPC Configuration
+
+Lambda functions can be attached to a VPC to access resources in private subnets (databases, internal APIs, etc.).
+
+**With VPC Configuration:**
+```hcl
+module "lambda" {
+  source  = "infrahouse/lambda-monitored/aws"
+  version = "0.1.0"
+
+  function_name     = "my-vpc-function"
+  lambda_source_dir = "${path.module}/lambda"
+  alarm_emails      = ["team@example.com"]
+
+  # VPC configuration
+  lambda_subnet_ids         = ["subnet-abc123", "subnet-def456"]
+  lambda_security_group_ids = [aws_security_group.lambda.id]
+}
+```
+
+**Important VPC Considerations:**
+
+1. **NAT Gateway Required**: Subnets must have a NAT gateway or NAT instance for internet access (AWS API calls, external dependencies, etc.)
+
+2. **Security Groups**: Configure security group rules to allow:
+   - Outbound traffic to required services (databases, APIs, etc.)
+   - Inbound traffic if Lambda needs to receive requests from within VPC
+
+3. **IAM Permissions**: The module automatically adds required EC2 network interface permissions:
+   - `ec2:CreateNetworkInterface`
+   - `ec2:DescribeNetworkInterfaces`
+   - `ec2:DeleteNetworkInterface`
+   - `ec2:AssignPrivateIpAddresses`
+   - `ec2:UnassignPrivateIpAddresses`
+
+4. **Cold Start**: VPC-attached Lambda functions have longer cold start times (~1-3 seconds additional) due to ENI creation
+
+5. **ENI Limits**: Each Lambda function in a VPC creates elastic network interfaces (ENIs). Monitor your ENI limits in the AWS account
+
+**When to Use VPC:**
+- ✅ Access RDS databases in private subnets
+- ✅ Connect to internal APIs or services
+- ✅ Use AWS PrivateLink endpoints
+- ✅ Access resources that require private IP addresses
+
+**When NOT to Use VPC:**
+- ❌ Public API calls only (no VPC needed, better performance)
+- ❌ Pure compute functions with no external connections
+- ❌ Functions requiring minimal cold start latency
+
 ## Notes
 
 ### Email Subscription Confirmation

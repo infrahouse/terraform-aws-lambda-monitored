@@ -193,3 +193,17 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+# VPC Configuration
+
+variable "lambda_subnet_ids" {
+  description = "List of subnet IDs for Lambda VPC configuration. The subnets must have NAT gateway for internet access. If not specified, Lambda will not be attached to a VPC."
+  type        = list(string)
+  default     = null
+}
+
+variable "lambda_security_group_ids" {
+  description = "List of security group IDs for Lambda VPC configuration. Required if lambda_subnet_ids is specified."
+  type        = list(string)
+  default     = null
+}

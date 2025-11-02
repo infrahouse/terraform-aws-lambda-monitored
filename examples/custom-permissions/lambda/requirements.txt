@@ -1,0 +1,3 @@
+# boto3 is included in AWS Lambda Python runtime by default
+# This file is provided for local development and testing
+boto3>=1.34.0

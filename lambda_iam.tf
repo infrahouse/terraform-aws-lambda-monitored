@@ -41,6 +41,33 @@ resource "aws_iam_role_policy" "lambda_logging" {
   policy = data.aws_iam_policy_document.lambda_logging.json
 }
 
+# IAM policy document for VPC access (only created when VPC config is specified)
+data "aws_iam_policy_document" "lambda_vpc_access" {
+  count = var.lambda_subnet_ids != null ? 1 : 0
+
+  statement {
+    effect = "Allow"
+    actions = [
+      "ec2:CreateNetworkInterface",
+      "ec2:DescribeNetworkInterfaces",
+      "ec2:DeleteNetworkInterface",
+      "ec2:AssignPrivateIpAddresses",
+      "ec2:UnassignPrivateIpAddresses"
+    ]
+    resources = ["*"]
+  }
+}
+
+# IAM policy for VPC access (only created when VPC config is specified)
+resource "aws_iam_role_policy" "lambda_vpc_access" {
+  count = var.lambda_subnet_ids != null ? 1 : 0
+
+  name = "${var.function_name}-vpc-access"
+  role = aws_iam_role.lambda.id
+
+  policy = data.aws_iam_policy_document.lambda_vpc_access[0].json
+}
+
 # Attach additional IAM policies to Lambda role
 resource "aws_iam_role_policy_attachment" "additional" {
   for_each = toset(var.additional_iam_policy_arns)

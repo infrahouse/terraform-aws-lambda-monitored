@@ -85,3 +85,15 @@ output "throttle_alarm_arn" {
     aws_cloudwatch_metric_alarm.throttles[0].arn, null
   ) : null
 }
+
+# VPC outputs
+
+output "vpc_config_subnet_ids" {
+  description = "List of subnet IDs for Lambda VPC configuration (if configured)"
+  value       = var.lambda_subnet_ids
+}
+
+output "vpc_config_security_group_ids" {
+  description = "List of security group IDs for Lambda VPC configuration (if configured)"
+  value       = var.lambda_security_group_ids
+}
