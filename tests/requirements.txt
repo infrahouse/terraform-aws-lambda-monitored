@@ -1,0 +1,4 @@
+# Test dependencies for terraform-aws-lambda-monitored
+infrahouse-core ~= 0.17
+pytest-infrahouse ~= 0.20
+yamllint ~= 1.37
