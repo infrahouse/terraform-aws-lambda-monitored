@@ -23,14 +23,14 @@ provider "aws" {
 
 # Use the lambda-monitored module with immediate alert strategy
 module "order_processor" {
-  source = "../../"  # Use published version: source = "infrahouse/lambda-monitored/aws"
+  source = "../../" # Use published version: source = "infrahouse/lambda-monitored/aws"
 
   function_name     = "order-processor-immediate"
   lambda_source_dir = "${path.module}/lambda"
 
   # Lambda configuration
   python_version = "python3.12"
-  architecture   = "arm64"  # Use ARM64 for cost optimization
+  architecture   = "arm64" # Use ARM64 for cost optimization
   timeout        = 30
   memory_size    = 256
   description    = "Critical order processor with immediate error alerts"

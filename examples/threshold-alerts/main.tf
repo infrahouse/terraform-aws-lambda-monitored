@@ -23,7 +23,7 @@ provider "aws" {
 
 # Use the lambda-monitored module with threshold alert strategy
 module "data_ingestion" {
-  source = "../../"  # Use published version: source = "infrahouse/lambda-monitored/aws"
+  source = "../../" # Use published version: source = "infrahouse/lambda-monitored/aws"
 
   function_name     = "data-ingestion-threshold"
   lambda_source_dir = "${path.module}/lambda"
@@ -45,9 +45,9 @@ module "data_ingestion" {
   alert_strategy = "threshold"
 
   # Alert when error rate exceeds 5% over 2 consecutive periods
-  error_rate_threshold           = 5.0  # 5% error rate
-  error_rate_evaluation_periods  = 2    # Number of periods to evaluate
-  error_rate_datapoints_to_alarm = 2    # Must breach in both periods
+  error_rate_threshold           = 5.0 # 5% error rate
+  error_rate_evaluation_periods  = 2   # Number of periods to evaluate
+  error_rate_datapoints_to_alarm = 2   # Must breach in both periods
 
   # Email addresses for alerts
   alarm_emails = var.alarm_emails
