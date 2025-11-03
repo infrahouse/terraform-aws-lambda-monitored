@@ -86,6 +86,13 @@ output "throttle_alarm_arn" {
   ) : null
 }
 
+output "duration_alarm_arn" {
+  description = "ARN of the duration CloudWatch alarm (if enabled)"
+  value = var.duration_threshold_percent != null ? try(
+    aws_cloudwatch_metric_alarm.duration[0].arn, null
+  ) : null
+}
+
 # VPC outputs
 
 output "vpc_config_subnet_ids" {

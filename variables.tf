@@ -188,6 +188,17 @@ variable "enable_throttle_alarms" {
   default     = true
 }
 
+variable "duration_threshold_percent" {
+  description = "Percentage of function timeout that triggers duration alarm (1-100). If not specified, duration alarm is disabled. For example, 80 means alarm when execution duration exceeds 80% of the configured timeout."
+  type        = number
+  default     = null
+
+  validation {
+    condition     = var.duration_threshold_percent == null || (var.duration_threshold_percent > 0 && var.duration_threshold_percent <= 100)
+    error_message = "Duration threshold percent must be between 1 and 100"
+  }
+}
+
 variable "tags" {
   description = "Map of tags to assign to resources"
   type        = map(string)

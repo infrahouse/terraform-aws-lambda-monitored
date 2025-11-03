@@ -102,3 +102,29 @@ resource "aws_cloudwatch_metric_alarm" "throttles" {
 
   tags = local.tags
 }
+
+# CloudWatch alarm for Lambda execution duration approaching timeout
+# Triggers when execution duration exceeds configured percentage of timeout
+# Threshold is calculated as: timeout * (duration_threshold_percent / 100) * 1000 (convert to milliseconds)
+resource "aws_cloudwatch_metric_alarm" "duration" {
+  count = var.duration_threshold_percent != null ? 1 : 0
+
+  alarm_name          = "${var.function_name}-duration"
+  alarm_description   = "Lambda function ${var.function_name} execution duration exceeds ${var.duration_threshold_percent}% of timeout (${var.timeout * (var.duration_threshold_percent / 100)}s)"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "Duration"
+  namespace           = "AWS/Lambda"
+  period              = 60
+  statistic           = "Maximum"
+  threshold           = var.timeout * (var.duration_threshold_percent / 100) * 1000 # Convert to milliseconds
+  treat_missing_data  = "notBreaching"
+
+  dimensions = {
+    FunctionName = aws_lambda_function.this.function_name
+  }
+
+  alarm_actions = local.all_alarm_topic_arns
+
+  tags = local.tags
+}
