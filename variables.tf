@@ -194,6 +194,23 @@ variable "tags" {
   default     = {}
 }
 
+# Encryption
+
+variable "kms_key_id" {
+  description = <<-EOF
+    ARN of the KMS key for encrypting CloudWatch Logs and SNS topic.
+    If not specified, AWS-managed encryption keys are used.
+    The key must allow the CloudWatch Logs and SNS services to use it.
+  EOF
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.kms_key_id == null || can(regex("^arn:aws:kms:", var.kms_key_id))
+    error_message = "KMS key ID must be a valid ARN starting with 'arn:aws:kms:'"
+  }
+}
+
 # VPC Configuration
 
 variable "lambda_subnet_ids" {

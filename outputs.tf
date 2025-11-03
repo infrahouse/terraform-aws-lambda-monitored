@@ -97,3 +97,10 @@ output "vpc_config_security_group_ids" {
   description = "List of security group IDs for Lambda VPC configuration (if configured)"
   value       = var.lambda_security_group_ids
 }
+
+# Encryption outputs
+
+output "kms_key_id" {
+  description = "ARN of the KMS key used for encrypting CloudWatch Logs and SNS topic (null if using AWS-managed encryption)"
+  value       = var.kms_key_id
+}
