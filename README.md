@@ -299,63 +299,107 @@ make clean               # Clean temporary files and test data
 ## License
 
 Apache 2.0
-
 ## Requirements
 
 | Name | Version |
 |------|---------|
-| terraform | ~> 1.0 |
-| aws | >= 5.31 |
+| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | ~> 1.0 |
+| <a name="requirement_archive"></a> [archive](#requirement\_archive) | ~> 2.0 |
+| <a name="requirement_aws"></a> [aws](#requirement\_aws) | >= 5.31, < 7.0 |
+| <a name="requirement_null"></a> [null](#requirement\_null) | ~> 3.0 |
 
 ## Providers
 
 | Name | Version |
 |------|---------|
-| aws | >= 5.31 |
-| archive | ~> 2.0 |
+| <a name="provider_archive"></a> [archive](#provider\_archive) | ~> 2.0 |
+| <a name="provider_aws"></a> [aws](#provider\_aws) | >= 5.31, < 7.0 |
+| <a name="provider_null"></a> [null](#provider\_null) | ~> 3.0 |
+
+## Modules
+
+| Name | Source | Version |
+|------|--------|---------|
+| <a name="module_lambda_bucket"></a> [lambda\_bucket](#module\_lambda\_bucket) | registry.infrahouse.com/infrahouse/s3-bucket/aws | 0.2.0 |
+
+## Resources
+
+| Name | Type |
+|------|------|
+| [aws_cloudwatch_log_group.lambda](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudwatch_log_group) | resource |
+| [aws_cloudwatch_metric_alarm.duration](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudwatch_metric_alarm) | resource |
+| [aws_cloudwatch_metric_alarm.errors_immediate](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudwatch_metric_alarm) | resource |
+| [aws_cloudwatch_metric_alarm.errors_threshold](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudwatch_metric_alarm) | resource |
+| [aws_cloudwatch_metric_alarm.throttles](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudwatch_metric_alarm) | resource |
+| [aws_iam_role.lambda](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role) | resource |
+| [aws_iam_role_policy.lambda_logging](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy) | resource |
+| [aws_iam_role_policy.lambda_vpc_access](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy) | resource |
+| [aws_iam_role_policy_attachment.additional](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy_attachment) | resource |
+| [aws_lambda_function.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/lambda_function) | resource |
+| [aws_lambda_function_event_invoke_config.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/lambda_function_event_invoke_config) | resource |
+| [aws_s3_object.lambda_package](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/s3_object) | resource |
+| [aws_sns_topic.alarms](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/sns_topic) | resource |
+| [aws_sns_topic_subscription.alarm_emails](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/sns_topic_subscription) | resource |
+| [null_resource.install_python_dependencies](https://registry.terraform.io/providers/hashicorp/null/latest/docs/resources/resource) | resource |
+| [archive_file.lambda_source_hash](https://registry.terraform.io/providers/hashicorp/archive/latest/docs/data-sources/file) | data source |
+| [aws_caller_identity.current](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/caller_identity) | data source |
+| [aws_iam_policy_document.lambda_assume_role](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_policy_document) | data source |
+| [aws_iam_policy_document.lambda_logging](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_policy_document) | data source |
+| [aws_iam_policy_document.lambda_vpc_access](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_policy_document) | data source |
+| [aws_region.current](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/region) | data source |
 
 ## Inputs
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
-| function_name | Name of the Lambda function | `string` | n/a | yes |
-| lambda_source_dir | Path to the directory containing Lambda function source code | `string` | n/a | yes |
-| alarm_emails | List of email addresses for alarm notifications | `list(string)` | n/a | yes |
-| python_version | Python runtime version | `string` | `"python3.12"` | no |
-| architecture | Instruction set architecture (x86_64 or arm64) | `string` | `"x86_64"` | no |
-| requirements_file | Path to requirements.txt for Python dependencies | `string` | `""` | no |
-| handler | Lambda function handler | `string` | `"main.lambda_handler"` | no |
-| timeout | Lambda function timeout in seconds | `number` | `60` | no |
-| memory_size | Lambda function memory size in MB | `number` | `128` | no |
-| description | Description of the Lambda function | `string` | `null` | no |
-| environment_variables | Map of environment variables | `map(string)` | `{}` | no |
-| additional_iam_policy_arns | List of IAM policy ARNs to attach | `list(string)` | `[]` | no |
-| cloudwatch_log_retention_days | Number of days to retain CloudWatch logs | `number` | `365` | no |
-| alarm_topic_arns | List of existing SNS topic ARNs for alarms | `list(string)` | `[]` | no |
-| sns_topic_name | Name for the SNS topic | `string` | `null` | no |
-| enable_error_alarms | Enable CloudWatch alarms for Lambda errors | `bool` | `true` | no |
-| alert_strategy | Alert strategy: 'immediate' or 'threshold' | `string` | `"immediate"` | no |
-| error_rate_threshold | Error rate percentage threshold (0-100) | `number` | `5.0` | no |
-| error_rate_evaluation_periods | Number of evaluation periods for error rate alarm | `number` | `2` | no |
-| error_rate_datapoints_to_alarm | Number of datapoints that must breach to trigger alarm | `number` | `2` | no |
-| enable_throttle_alarms | Enable CloudWatch alarms for Lambda throttling | `bool` | `true` | no |
-| tags | Map of tags to assign to resources | `map(string)` | `{}` | no |
+| <a name="input_additional_iam_policy_arns"></a> [additional\_iam\_policy\_arns](#input\_additional\_iam\_policy\_arns) | List of IAM policy ARNs to attach to the Lambda execution role | `list(string)` | `[]` | no |
+| <a name="input_alarm_emails"></a> [alarm\_emails](#input\_alarm\_emails) | List of email addresses to receive alarm notifications. AWS will send confirmation emails that must be accepted. At least one email is required. | `list(string)` | n/a | yes |
+| <a name="input_alarm_topic_arns"></a> [alarm\_topic\_arns](#input\_alarm\_topic\_arns) | List of existing SNS topic ARNs to send alarms to (for advanced integrations like PagerDuty, Slack, etc.) | `list(string)` | `[]` | no |
+| <a name="input_alert_strategy"></a> [alert\_strategy](#input\_alert\_strategy) | Alert strategy: 'immediate' (alert on any error) or 'threshold' (alert when error rate exceeds threshold) | `string` | `"immediate"` | no |
+| <a name="input_architecture"></a> [architecture](#input\_architecture) | Instruction set architecture for the Lambda function. Valid values: x86\_64 or arm64 | `string` | `"x86_64"` | no |
+| <a name="input_cloudwatch_log_retention_days"></a> [cloudwatch\_log\_retention\_days](#input\_cloudwatch\_log\_retention\_days) | Number of days to retain CloudWatch logs | `number` | `365` | no |
+| <a name="input_description"></a> [description](#input\_description) | Description of the Lambda function | `string` | `null` | no |
+| <a name="input_duration_threshold_percent"></a> [duration\_threshold\_percent](#input\_duration\_threshold\_percent) | Percentage of function timeout that triggers duration alarm (1-100). If not specified, duration alarm is disabled. For example, 80 means alarm when execution duration exceeds 80% of the configured timeout. | `number` | `null` | no |
+| <a name="input_enable_error_alarms"></a> [enable\_error\_alarms](#input\_enable\_error\_alarms) | Enable CloudWatch alarms for Lambda errors | `bool` | `true` | no |
+| <a name="input_enable_throttle_alarms"></a> [enable\_throttle\_alarms](#input\_enable\_throttle\_alarms) | Enable CloudWatch alarms for Lambda throttling | `bool` | `true` | no |
+| <a name="input_environment_variables"></a> [environment\_variables](#input\_environment\_variables) | Map of environment variables for the Lambda function | `map(string)` | `{}` | no |
+| <a name="input_error_rate_datapoints_to_alarm"></a> [error\_rate\_datapoints\_to\_alarm](#input\_error\_rate\_datapoints\_to\_alarm) | Number of datapoints that must breach threshold to trigger alarm | `number` | `2` | no |
+| <a name="input_error_rate_evaluation_periods"></a> [error\_rate\_evaluation\_periods](#input\_error\_rate\_evaluation\_periods) | Number of evaluation periods for error rate alarm | `number` | `2` | no |
+| <a name="input_error_rate_threshold"></a> [error\_rate\_threshold](#input\_error\_rate\_threshold) | Error rate percentage threshold for 'threshold' alert strategy (0-100) | `number` | `5` | no |
+| <a name="input_function_name"></a> [function\_name](#input\_function\_name) | Name of the Lambda function | `string` | n/a | yes |
+| <a name="input_handler"></a> [handler](#input\_handler) | Lambda function handler (format: file.function\_name) | `string` | `"main.lambda_handler"` | no |
+| <a name="input_kms_key_id"></a> [kms\_key\_id](#input\_kms\_key\_id) | ARN of the KMS key for encrypting CloudWatch Logs and SNS topic.<br/>If not specified, AWS-managed encryption keys are used.<br/>The key must allow the CloudWatch Logs and SNS services to use it. | `string` | `null` | no |
+| <a name="input_lambda_security_group_ids"></a> [lambda\_security\_group\_ids](#input\_lambda\_security\_group\_ids) | List of security group IDs for Lambda VPC configuration. Required if lambda\_subnet\_ids is specified. | `list(string)` | `null` | no |
+| <a name="input_lambda_source_dir"></a> [lambda\_source\_dir](#input\_lambda\_source\_dir) | Path to the directory containing Lambda function source code | `string` | n/a | yes |
+| <a name="input_lambda_subnet_ids"></a> [lambda\_subnet\_ids](#input\_lambda\_subnet\_ids) | List of subnet IDs for Lambda VPC configuration. The subnets must have NAT gateway for internet access. If not specified, Lambda will not be attached to a VPC. | `list(string)` | `null` | no |
+| <a name="input_memory_size"></a> [memory\_size](#input\_memory\_size) | Lambda function memory size in MB | `number` | `128` | no |
+| <a name="input_python_version"></a> [python\_version](#input\_python\_version) | Python runtime version. Must be one of https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html | `string` | `"python3.12"` | no |
+| <a name="input_requirements_file"></a> [requirements\_file](#input\_requirements\_file) | Path to requirements.txt file for Python dependencies.<br/>Dependencies will be installed with platform-specific wheels for the target architecture.<br/>If not specified, the module will automatically look for requirements.txt in var.lambda\_source\_dir.<br/>Set to null to explicitly skip dependency installation. | `string` | `null` | no |
+| <a name="input_sns_topic_name"></a> [sns\_topic\_name](#input\_sns\_topic\_name) | Name for the SNS topic. If not provided, defaults to '<function\_name>-alarms' | `string` | `null` | no |
+| <a name="input_tags"></a> [tags](#input\_tags) | Map of tags to assign to resources | `map(string)` | `{}` | no |
+| <a name="input_timeout"></a> [timeout](#input\_timeout) | Lambda function timeout in seconds | `number` | `60` | no |
 
 ## Outputs
 
 | Name | Description |
 |------|-------------|
-| lambda_function_arn | ARN of the Lambda function |
-| lambda_function_name | Name of the Lambda function |
-| lambda_function_invoke_arn | Invoke ARN of the Lambda function |
-| lambda_role_arn | ARN of the IAM role used by the Lambda function |
-| lambda_role_name | Name of the IAM role used by the Lambda function |
-| cloudwatch_log_group_name | Name of the CloudWatch Log Group |
-| cloudwatch_log_group_arn | ARN of the CloudWatch Log Group |
-| s3_bucket_name | Name of the S3 bucket storing Lambda packages |
-| s3_bucket_arn | ARN of the S3 bucket storing Lambda packages |
-| sns_topic_arn | ARN of the SNS topic for alarm notifications |
-| sns_topic_name | Name of the SNS topic for alarm notifications |
-| pending_email_confirmations | List of emails pending SNS subscription confirmation |
-| error_alarm_arn | ARN of the error CloudWatch alarm (if enabled) |
-| throttle_alarm_arn | ARN of the throttle CloudWatch alarm (if enabled) |
+| <a name="output_cloudwatch_log_group_arn"></a> [cloudwatch\_log\_group\_arn](#output\_cloudwatch\_log\_group\_arn) | ARN of the CloudWatch Log Group |
+| <a name="output_cloudwatch_log_group_name"></a> [cloudwatch\_log\_group\_name](#output\_cloudwatch\_log\_group\_name) | Name of the CloudWatch Log Group |
+| <a name="output_duration_alarm_arn"></a> [duration\_alarm\_arn](#output\_duration\_alarm\_arn) | ARN of the duration CloudWatch alarm (if enabled) |
+| <a name="output_error_alarm_arn"></a> [error\_alarm\_arn](#output\_error\_alarm\_arn) | ARN of the error CloudWatch alarm (if enabled) |
+| <a name="output_kms_key_id"></a> [kms\_key\_id](#output\_kms\_key\_id) | ARN of the KMS key used for encrypting CloudWatch Logs and SNS topic (null if using AWS-managed encryption) |
+| <a name="output_lambda_function_arn"></a> [lambda\_function\_arn](#output\_lambda\_function\_arn) | ARN of the Lambda function |
+| <a name="output_lambda_function_invoke_arn"></a> [lambda\_function\_invoke\_arn](#output\_lambda\_function\_invoke\_arn) | Invoke ARN of the Lambda function (for use with API Gateway, etc.) |
+| <a name="output_lambda_function_name"></a> [lambda\_function\_name](#output\_lambda\_function\_name) | Name of the Lambda function |
+| <a name="output_lambda_function_qualified_arn"></a> [lambda\_function\_qualified\_arn](#output\_lambda\_function\_qualified\_arn) | Qualified ARN of the Lambda function (includes version) |
+| <a name="output_lambda_role_arn"></a> [lambda\_role\_arn](#output\_lambda\_role\_arn) | ARN of the IAM role used by the Lambda function |
+| <a name="output_lambda_role_name"></a> [lambda\_role\_name](#output\_lambda\_role\_name) | Name of the IAM role used by the Lambda function |
+| <a name="output_pending_email_confirmations"></a> [pending\_email\_confirmations](#output\_pending\_email\_confirmations) | List of email addresses pending SNS subscription confirmation |
+| <a name="output_requirements_file_used"></a> [requirements\_file\_used](#output\_requirements\_file\_used) | Path to the requirements.txt file used for packaging (or 'none' if no dependencies) |
+| <a name="output_s3_bucket_arn"></a> [s3\_bucket\_arn](#output\_s3\_bucket\_arn) | ARN of the S3 bucket storing Lambda packages |
+| <a name="output_s3_bucket_name"></a> [s3\_bucket\_name](#output\_s3\_bucket\_name) | Name of the S3 bucket storing Lambda packages |
+| <a name="output_sns_topic_arn"></a> [sns\_topic\_arn](#output\_sns\_topic\_arn) | ARN of the SNS topic for alarm notifications |
+| <a name="output_sns_topic_name"></a> [sns\_topic\_name](#output\_sns\_topic\_name) | Name of the SNS topic for alarm notifications |
+| <a name="output_throttle_alarm_arn"></a> [throttle\_alarm\_arn](#output\_throttle\_alarm\_arn) | ARN of the throttle CloudWatch alarm (if enabled) |
+| <a name="output_vpc_config_security_group_ids"></a> [vpc\_config\_security\_group\_ids](#output\_vpc\_config\_security\_group\_ids) | List of security group IDs for Lambda VPC configuration (if configured) |
+| <a name="output_vpc_config_subnet_ids"></a> [vpc\_config\_subnet\_ids](#output\_vpc\_config\_subnet\_ids) | List of subnet IDs for Lambda VPC configuration (if configured) |
