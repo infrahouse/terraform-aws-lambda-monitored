@@ -188,10 +188,38 @@ variable "enable_throttle_alarms" {
   default     = true
 }
 
+variable "duration_threshold_percent" {
+  description = "Percentage of function timeout that triggers duration alarm (1-100). If not specified, duration alarm is disabled. For example, 80 means alarm when execution duration exceeds 80% of the configured timeout."
+  type        = number
+  default     = null
+
+  validation {
+    condition     = var.duration_threshold_percent == null || (var.duration_threshold_percent > 0 && var.duration_threshold_percent <= 100)
+    error_message = "Duration threshold percent must be between 1 and 100"
+  }
+}
+
 variable "tags" {
   description = "Map of tags to assign to resources"
   type        = map(string)
   default     = {}
+}
+
+# Encryption
+
+variable "kms_key_id" {
+  description = <<-EOF
+    ARN of the KMS key for encrypting CloudWatch Logs and SNS topic.
+    If not specified, AWS-managed encryption keys are used.
+    The key must allow the CloudWatch Logs and SNS services to use it.
+  EOF
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.kms_key_id == null || can(regex("^arn:aws:kms:", var.kms_key_id))
+    error_message = "KMS key ID must be a valid ARN starting with 'arn:aws:kms:'"
+  }
 }
 
 # VPC Configuration

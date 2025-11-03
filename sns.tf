@@ -1,6 +1,10 @@
 # SNS topic for Lambda alarms
+# Encrypted at rest:
+# - With customer-managed KMS key if var.kms_key_id is provided
+# - With AWS-managed encryption keys if var.kms_key_id is null (default)
 resource "aws_sns_topic" "alarms" {
-  name = var.sns_topic_name != null ? var.sns_topic_name : "${var.function_name}-alarms"
+  name              = var.sns_topic_name != null ? var.sns_topic_name : "${var.function_name}-alarms"
+  kms_master_key_id = var.kms_key_id
 
   tags = local.tags
 }

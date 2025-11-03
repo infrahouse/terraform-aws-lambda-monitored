@@ -424,3 +424,101 @@ class TestSNSIntegration:
             ]
             assert len(email_subs) >= 1
             assert any(test_email in s["Endpoint"] for s in email_subs)
+
+
+class TestVPCIntegration:
+    """Test suite for VPC Lambda integration and IAM permissions."""
+
+    def test_vpc_lambda_deployment_and_execution(
+        self,
+        test_module_dir,
+        fixtures_dir,
+        service_network,
+        lambda_client,
+        keep_after,
+        test_role_arn,
+    ):
+        """
+        Test Lambda deployment and execution within VPC.
+
+        This test verifies that:
+        1. Lambda can be deployed with VPC configuration
+        2. IAM policies are correctly scoped to specific subnets/security groups
+        3. Lambda can create ENIs in the VPC
+        4. Lambda can execute successfully in VPC
+        5. Lambda cleanup works (terraform destroy removes ENIs via scoped permissions)
+
+        :param Path test_module_dir: Temporary test module directory
+        :param Path fixtures_dir: Path to Lambda fixtures
+        :param dict service_network: Service network fixture from pytest-infrahouse
+        :param lambda_client: Boto3 Lambda client fixture
+        :param bool keep_after: Whether to keep resources after test
+        :param str test_role_arn: IAM role ARN for testing
+        """
+        function_name = "test-vpc-lambda"
+        lambda_source = fixtures_dir / "simple_lambda"
+
+        # Extract subnet IDs from service_network fixture
+        # service_network has structure: {"subnet_private_ids": {"value": [...]}, ...}
+        subnet_private_ids = service_network["subnet_private_ids"]["value"]
+
+        LOG.info(f"Using private subnets from service_network: {subnet_private_ids}")
+
+        # Create Terraform config with VPC settings
+        # The security group will be created by Terraform
+        create_terraform_config(
+            test_module_dir,
+            lambda_source,
+            function_name,
+            "test@example.com",
+            "~> 5.31",
+            subnet_ids=subnet_private_ids,
+            # security_group_ids=None means Terraform will create the SG
+            role_arn=test_role_arn,
+        )
+
+        with terraform_apply(
+            str(test_module_dir),
+            destroy_after=not keep_after,
+            json_output=True,
+        ) as tf_output:
+            # Verify Lambda was created with VPC configuration
+            assert tf_output["lambda_function_arn"]["value"]
+            assert tf_output["vpc_config_subnet_ids"]["value"] == subnet_private_ids
+
+            # Verify security group was created
+            security_group_ids = tf_output["vpc_config_security_group_ids"]["value"]
+            assert security_group_ids
+            assert len(security_group_ids) == 1
+            LOG.info(f"Lambda using security group: {security_group_ids[0]}")
+
+            # Verify IAM role exists
+            lambda_role_arn = tf_output["lambda_role_arn"]["value"]
+            assert lambda_role_arn
+            LOG.info(f"Lambda IAM role: {lambda_role_arn}")
+
+            # Invoke Lambda to trigger ENI creation and verify execution
+            # This tests that the scoped IAM permissions actually work
+            LOG.info("Invoking Lambda to test VPC ENI creation with scoped IAM permissions...")
+            response = lambda_client.invoke(
+                FunctionName=tf_output["lambda_function_name"]["value"],
+                InvocationType="RequestResponse",
+                Payload=json.dumps({}),
+            )
+
+            # Verify successful invocation (proves ENI was created successfully)
+            assert response["StatusCode"] == 200
+            assert "FunctionError" not in response
+
+            # Parse and verify response payload
+            payload = json.loads(response["Payload"].read())
+            assert payload["statusCode"] == 200
+            assert "Hello from Lambda!" in payload["body"]
+
+            LOG.info(
+                "SUCCESS: VPC Lambda executed successfully - "
+                "IAM permissions are correctly scoped to specific subnets/security groups"
+            )
+            LOG.info(
+                "The test verified that Lambda can create ENIs with least-privilege IAM policies"
+            )

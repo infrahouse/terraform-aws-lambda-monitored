@@ -86,6 +86,13 @@ output "throttle_alarm_arn" {
   ) : null
 }
 
+output "duration_alarm_arn" {
+  description = "ARN of the duration CloudWatch alarm (if enabled)"
+  value = var.duration_threshold_percent != null ? try(
+    aws_cloudwatch_metric_alarm.duration[0].arn, null
+  ) : null
+}
+
 # VPC outputs
 
 output "vpc_config_subnet_ids" {
@@ -96,4 +103,11 @@ output "vpc_config_subnet_ids" {
 output "vpc_config_security_group_ids" {
   description = "List of security group IDs for Lambda VPC configuration (if configured)"
   value       = var.lambda_security_group_ids
+}
+
+# Encryption outputs
+
+output "kms_key_id" {
+  description = "ARN of the KMS key used for encrypting CloudWatch Logs and SNS topic (null if using AWS-managed encryption)"
+  value       = var.kms_key_id
 }
