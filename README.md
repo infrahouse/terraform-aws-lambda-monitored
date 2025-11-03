@@ -1,5 +1,10 @@
 # terraform-aws-lambda-monitored
 
+[![InfraHouse](https://img.shields.io/badge/InfraHouse-Terraform_Module-blue?logo=terraform)](https://registry.terraform.io/modules/infrahouse/lambda-monitored/aws/latest)
+[![License](https://img.shields.io/github/license/infrahouse/terraform-aws-lambda-monitored)](LICENSE)
+[![CI](https://github.com/infrahouse/terraform-aws-lambda-monitored/actions/workflows/terraform-CI.yml/badge.svg)](https://github.com/infrahouse/terraform-aws-lambda-monitored/actions/workflows/terraform-CI.yml)
+[![AWS Lambda](https://img.shields.io/badge/AWS-Lambda-orange?logo=awslambda)](https://aws.amazon.com/lambda/)
+
 AWS Lambda function module with built-in monitoring and alerting capabilities.
 
 This module creates a Lambda function with CloudWatch Logs, configurable error monitoring, and SNS-based alerting.
