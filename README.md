@@ -198,6 +198,12 @@ module "lambda" {
 
 ## Notes
 
+### IAM Role Naming
+
+If your `function_name` exceeds 37 characters, the IAM role name will be truncated to comply with AWS's 38-character `name_prefix` limit. The full function name is always preserved in the IAM role's `function_name` tag for identification purposes.
+
+**Best Practice:** Reference the IAM role using the module outputs (`lambda_role_arn` or `lambda_role_name`) rather than constructing the role name manually.
+
 ### Email Subscription Confirmation
 
 When you specify `alarm_emails`, AWS will send a confirmation email to each address.

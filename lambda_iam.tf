@@ -16,11 +16,16 @@ data "aws_iam_policy_document" "lambda_assume_role" {
 
 # IAM role for Lambda execution
 resource "aws_iam_role" "lambda" {
-  name_prefix = "${var.function_name}-role-"
+  name_prefix = "${substr(var.function_name, 0, min(length(var.function_name), 37))}-"
 
   assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
 
-  tags = local.tags
+  tags = merge(
+    local.tags,
+    {
+      function_name = var.function_name
+    }
+  )
 }
 
 # IAM policy document for CloudWatch Logs

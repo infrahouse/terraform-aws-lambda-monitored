@@ -99,3 +99,55 @@ format:  ## Format terraform and Python files
 	terraform fmt -recursive
 	@echo "Formatting Python files"
 	black tests/
+
+# Internal function to handle version release
+# Args: $(1) = major|minor|patch
+define do_release
+	@BRANCH=$$(git rev-parse --abbrev-ref HEAD); \
+	if [ "$$BRANCH" != "main" ]; then \
+		echo "Error: You must be on the 'main' branch to release."; \
+		echo "Current branch: $$BRANCH"; \
+		exit 1; \
+	fi; \
+	CURRENT=$$(grep current_version .bumpversion.cfg | cut -d= -f2 | tr -d ' '); \
+	echo "Current version: $$CURRENT"; \
+	MAJOR=$$(echo $$CURRENT | cut -d. -f1); \
+	MINOR=$$(echo $$CURRENT | cut -d. -f2); \
+	PATCH=$$(echo $$CURRENT | cut -d. -f3); \
+	if [ "$(1)" = "major" ]; then \
+		NEW_VERSION=$$((MAJOR + 1)).0.0; \
+	elif [ "$(1)" = "minor" ]; then \
+		NEW_VERSION=$$MAJOR.$$((MINOR + 1)).0; \
+	elif [ "$(1)" = "patch" ]; then \
+		NEW_VERSION=$$MAJOR.$$MINOR.$$((PATCH + 1)); \
+	fi; \
+	echo "New version will be: $$NEW_VERSION"; \
+	read -p "Continue? (y/n) " -n 1 -r; \
+	echo; \
+	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
+		DATE=$$(date +%Y-%m-%d); \
+		sed -i "s/## \[Unreleased\]/## [$$NEW_VERSION] - $$DATE/" CHANGELOG.md; \
+		sed -i "8i\\\n## [Unreleased]\\\n" CHANGELOG.md; \
+		git add CHANGELOG.md; \
+		bumpversion --new-version $$NEW_VERSION patch; \
+		echo ""; \
+		echo "✓ Released version $$NEW_VERSION"; \
+		echo ""; \
+		echo "Next steps:"; \
+		echo "  git push && git push --tags"; \
+	else \
+		echo "Release cancelled"; \
+	fi
+endef
+
+.PHONY: release-patch
+release-patch:  ## Release a new patch version (e.g., 0.3.1 -> 0.3.2)
+	$(call do_release,patch)
+
+.PHONY: release-minor
+release-minor:  ## Release a new minor version (e.g., 0.3.1 -> 0.4.0)
+	$(call do_release,minor)
+
+.PHONY: release-major
+release-major:  ## Release a new major version (e.g., 0.3.1 -> 1.0.0)
+	$(call do_release,major)
