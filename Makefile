@@ -109,7 +109,7 @@ define do_release
 		echo "Current branch: $$BRANCH"; \
 		exit 1; \
 	fi; \
-	CURRENT=$$(grep current_version .bumpversion.cfg | cut -d= -f2 | tr -d ' '); \
+	CURRENT=$$(grep ^current_version .bumpversion.cfg | head -1 | cut -d= -f2 | tr -d ' '); \
 	echo "Current version: $$CURRENT"; \
 	MAJOR=$$(echo $$CURRENT | cut -d. -f1); \
 	MINOR=$$(echo $$CURRENT | cut -d. -f2); \
@@ -122,22 +122,26 @@ define do_release
 		NEW_VERSION=$$MAJOR.$$MINOR.$$((PATCH + 1)); \
 	fi; \
 	echo "New version will be: $$NEW_VERSION"; \
-	read -p "Continue? (y/n) " -n 1 -r; \
-	echo; \
-	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
-		DATE=$$(date +%Y-%m-%d); \
-		sed -i "s/## \[Unreleased\]/## [$$NEW_VERSION] - $$DATE/" CHANGELOG.md; \
-		sed -i "8i\\\n## [Unreleased]\\\n" CHANGELOG.md; \
-		git add CHANGELOG.md; \
-		bumpversion --new-version $$NEW_VERSION patch; \
-		echo ""; \
-		echo "✓ Released version $$NEW_VERSION"; \
-		echo ""; \
-		echo "Next steps:"; \
-		echo "  git push && git push --tags"; \
-	else \
-		echo "Release cancelled"; \
-	fi
+	printf "Continue? (y/n) "; \
+	read -r REPLY; \
+	case "$$REPLY" in \
+		[Yy]|[Yy][Ee][Ss]) \
+			DATE=$$(date +%Y-%m-%d); \
+			sed -i "s/## \[Unreleased\]/## [$$NEW_VERSION] - $$DATE/" CHANGELOG.md; \
+			sed -i "8i\\\n## [Unreleased]\\\n" CHANGELOG.md; \
+			git add CHANGELOG.md; \
+			git commit -a --amend; \
+			bumpversion --new-version $$NEW_VERSION patch; \
+			echo ""; \
+			echo "✓ Released version $$NEW_VERSION"; \
+			echo ""; \
+			echo "Next steps:"; \
+			echo "  git push && git push --tags"; \
+			;; \
+		*) \
+			echo "Release cancelled"; \
+			;; \
+	esac
 endef
 
 .PHONY: release-patch
