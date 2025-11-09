@@ -128,7 +128,7 @@ define do_release
 		[Yy]|[Yy][Ee][Ss]) \
 			DATE=$$(date +%Y-%m-%d); \
 			sed -i "s/## \[Unreleased\]/## [$$NEW_VERSION] - $$DATE/" CHANGELOG.md; \
-			sed -i "8i\\\n## [Unreleased]\\\n" CHANGELOG.md; \
+			sed -i "8i\\\n## [Unreleased]" CHANGELOG.md; \
 			git add CHANGELOG.md; \
 			git commit -a --amend; \
 			bumpversion --new-version $$NEW_VERSION patch; \
