@@ -139,8 +139,8 @@ resource "aws_iam_role_policy" "lambda_vpc_access" {
 
 # Attach additional IAM policies to Lambda role
 resource "aws_iam_role_policy_attachment" "additional" {
-  for_each = toset(var.additional_iam_policy_arns)
+  count = length(var.additional_iam_policy_arns)
 
   role       = aws_iam_role.lambda.name
-  policy_arn = each.value
+  policy_arn = var.additional_iam_policy_arns[count.index]
 }

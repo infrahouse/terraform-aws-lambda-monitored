@@ -8,9 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.3.3] - 2025-11-09
+## [0.3.4] - 2025-11-09
 
-## [0.3.2] - 2025-11-09
+### Fixed
+- Fixed `for_each` error when `additional_iam_policy_arns` contains computed values by switching to `count`
+
+## [0.3.3] - 2025-11-09
 
 ### Fixed
 - Fixed IAM role creation failure when `function_name` exceeds 37 characters
