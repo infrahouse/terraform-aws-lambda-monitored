@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Fixed IAM role creation failure when `function_name` exceeds 37 characters
+- IAM role `name_prefix` now truncates function names longer than 37 characters to comply with AWS's 38-character limit
+- Removed redundant "-role-" suffix from IAM role names (now uses up to 37 characters of function name instead of 32)
+- Full function name is preserved in the IAM role's `function_name` tag for identification
+
 ### Added
 - **VPC Configuration Support**: Lambda functions can now be attached to VPC for accessing private resources
   - `lambda_subnet_ids` variable for specifying VPC subnets (must have NAT gateway)
