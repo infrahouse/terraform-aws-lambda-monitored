@@ -130,7 +130,7 @@ define do_release
 			sed -i "s/## \[Unreleased\]/## [$$NEW_VERSION] - $$DATE/" CHANGELOG.md; \
 			sed -i "8i\\\n## [Unreleased]" CHANGELOG.md; \
 			git add CHANGELOG.md; \
-			git commit -a --amend; \
+			git commit -a -m "Record release $$NEW_VERSION in CHANGELOG.md"; \
 			bumpversion --new-version $$NEW_VERSION patch; \
 			echo ""; \
 			echo "✓ Released version $$NEW_VERSION"; \
