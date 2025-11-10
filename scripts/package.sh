@@ -94,18 +94,34 @@ echo "  Output: ${OUTPUT_DIR}"
 echo "  Architecture: ${ARCH} (${PLATFORM})"
 echo "  Python: ${PYTHON_VERSION} (${PY_VER})"
 
-# Create output directory
-mkdir -p "${OUTPUT_DIR}"
+# Get absolute paths for comparison (before creating output dir)
+SOURCE_ABS=$(cd "${SOURCE_DIR}" && pwd)
 
-# Clean output directory if it exists
+# Normalize OUTPUT_DIR to absolute path
 if [ -d "${OUTPUT_DIR}" ]; then
-    echo "Cleaning existing output directory..."
-    rm -rf "${OUTPUT_DIR:?}"/*
+    OUTPUT_ABS=$(cd "${OUTPUT_DIR}" && pwd)
+else
+    # If output dir doesn't exist, resolve it relative to current directory
+    OUTPUT_ABS=$(mkdir -p "${OUTPUT_DIR}" && cd "${OUTPUT_DIR}" && pwd)
 fi
 
-# Copy source files to output directory
-echo "Copying source files..."
-cp -r "${SOURCE_DIR}"/* "${OUTPUT_DIR}/"
+# Only clean and copy if source and output are different directories
+if [ "${SOURCE_ABS}" = "${OUTPUT_ABS}" ]; then
+    echo "Source and output directories are the same, building in place..."
+else
+    # Clean output directory if it exists
+    if [ -d "${OUTPUT_DIR}" ]; then
+        echo "Cleaning existing output directory..."
+        rm -rf "${OUTPUT_DIR:?}"/*
+    else
+        # Create output directory if it doesn't exist
+        mkdir -p "${OUTPUT_DIR}"
+    fi
+
+    # Copy source files to output directory
+    echo "Copying source files..."
+    cp -r "${SOURCE_DIR}"/* "${OUTPUT_DIR}/"
+fi
 
 # Install dependencies if requirements file exists and is not "none"
 if [[ "${REQUIREMENTS_FILE}" != "none" ]] && [[ -f "${REQUIREMENTS_FILE}" ]]; then

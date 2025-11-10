@@ -499,7 +499,9 @@ class TestVPCIntegration:
 
             # Invoke Lambda to trigger ENI creation and verify execution
             # This tests that the scoped IAM permissions actually work
-            LOG.info("Invoking Lambda to test VPC ENI creation with scoped IAM permissions...")
+            LOG.info(
+                "Invoking Lambda to test VPC ENI creation with scoped IAM permissions..."
+            )
             response = lambda_client.invoke(
                 FunctionName=tf_output["lambda_function_name"]["value"],
                 InvocationType="RequestResponse",

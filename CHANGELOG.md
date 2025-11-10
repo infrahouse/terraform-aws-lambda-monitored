@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Lambda package zip files now use deterministic hash-based filenames (e.g., `function-name-abc123.zip`) based on source code, dependencies, architecture, and Python version
+
+### Fixed
+- Fixed packaging script error when source and output directories are the same
+
 ## [0.3.4] - 2025-11-09
 
 ### Fixed

@@ -267,7 +267,7 @@ def create_terraform_config(
     if role_arn:
         tfvars_content += f'role_arn = "{role_arn}"\n'
     if subnet_ids and security_group_ids is None:
-        tfvars_content += f'subnet_ids = {json.dumps(subnet_ids)}\n'
+        tfvars_content += f"subnet_ids = {json.dumps(subnet_ids)}\n"
         tfvars_content += f'function_name = "{function_name}"\n'
     (module_dir / "terraform.tfvars").write_text(tfvars_content)
 
