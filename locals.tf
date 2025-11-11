@@ -1,6 +1,6 @@
 locals {
   module         = "infrahouse/lambda-monitored/aws"
-  module_version = "0.3.5"
+  module_version = "1.0.0"
 
   default_module_tags = {
     created_by_module = local.module
