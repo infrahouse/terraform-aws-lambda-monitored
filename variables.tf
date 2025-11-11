@@ -69,6 +69,17 @@ variable "lambda_source_dir" {
   type        = string
 }
 
+variable "source_code_files" {
+  description = <<-EOF
+    List of source code file patterns to track for changes (relative to lambda_source_dir).
+    Only these files will trigger repackaging. Installed dependencies are tracked separately via requirements_file.
+    Use glob patterns like "*.py" for root-level files or specific files like "main.py", "utils.py".
+    Default tracks only main.py to avoid hashing installed dependencies.
+  EOF
+  type        = list(string)
+  default     = ["main.py"]
+}
+
 variable "requirements_file" {
   description = <<-EOF
     Path to requirements.txt file for Python dependencies.

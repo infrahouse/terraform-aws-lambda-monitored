@@ -10,7 +10,9 @@
       "Bash(terraform fmt:*)",
       "Bash(yamllint:*)",
       "Bash(terraform init:*)",
-      "Bash(terraform validate:*)"
+      "Bash(terraform validate:*)",
+      "Bash(terraform-docs:*)",
+      "Bash(make lint:*)"
     ],
     "deny": [],
     "ask": []

@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- New `source_code_files` variable to explicitly specify which files to track for change detection
+
+### Changed
+- **BREAKING**: Source code change detection now only tracks `main.py` by default (was `**/*.py`)
+- This prevents hashing installed dependencies and avoids unnecessary rebuilds when `.terraform` is recreated
+
+### Fixed
+- Fixed unnecessary Lambda repackaging when dependencies are reinstalled identically
+
 ## [0.3.5] - 2025-11-09
 
 ### Changed
