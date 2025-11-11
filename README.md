@@ -141,6 +141,38 @@ module "lambda" {
 3. Only re-packages when source code, dependencies, architecture, or Python version changes
 4. Automatically cleans up Python cache files (`__pycache__`, `.pyc`)
 
+**Tracking Source Code Changes:**
+
+The module tracks changes to your source code to determine when to rebuild. By default, it only tracks `main.py` to avoid hashing installed dependencies. You can customize this with the `source_code_files` variable:
+
+```hcl
+# Default - tracks only main.py
+module "lambda" {
+  source            = "infrahouse/lambda-monitored/aws"
+  lambda_source_dir = "${path.module}/lambda"
+  # source_code_files defaults to ["main.py"]
+  ...
+}
+
+# Track multiple specific files
+module "lambda" {
+  source            = "infrahouse/lambda-monitored/aws"
+  lambda_source_dir = "${path.module}/lambda"
+  source_code_files = ["main.py", "utils.py", "config.py"]
+  ...
+}
+
+# Track all root-level .py files (useful if you have multiple source files)
+module "lambda" {
+  source            = "infrahouse/lambda-monitored/aws"
+  lambda_source_dir = "${path.module}/lambda"
+  source_code_files = ["*.py"]
+  ...
+}
+```
+
+**Important:** Dependencies are tracked separately via `requirements_file` hash. Only list your actual source code files in `source_code_files`, not installed packages. This prevents unnecessary rebuilds when `.terraform` is recreated.
+
 **Requirements:**
 - Python 3 must be installed locally (used by packaging script)
 - The `pip` module must be available
@@ -310,6 +342,11 @@ make clean               # Clean temporary files and test data
 ## License
 
 Apache 2.0
+
+---
+
+<!-- BEGIN_TF_DOCS -->
+
 ## Requirements
 
 | Name | Version |
@@ -387,6 +424,7 @@ Apache 2.0
 | <a name="input_python_version"></a> [python\_version](#input\_python\_version) | Python runtime version. Must be one of https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html | `string` | `"python3.12"` | no |
 | <a name="input_requirements_file"></a> [requirements\_file](#input\_requirements\_file) | Path to requirements.txt file for Python dependencies.<br/>Dependencies will be installed with platform-specific wheels for the target architecture.<br/>If not specified, the module will automatically look for requirements.txt in var.lambda\_source\_dir.<br/>Set to null to explicitly skip dependency installation. | `string` | `null` | no |
 | <a name="input_sns_topic_name"></a> [sns\_topic\_name](#input\_sns\_topic\_name) | Name for the SNS topic. If not provided, defaults to '<function\_name>-alarms' | `string` | `null` | no |
+| <a name="input_source_code_files"></a> [source\_code\_files](#input\_source\_code\_files) | List of source code file patterns to track for changes (relative to lambda\_source\_dir).<br/>Only these files will trigger repackaging. Installed dependencies are tracked separately via requirements\_file.<br/>Use glob patterns like "*.py" for root-level files or specific files like "main.py", "utils.py".<br/>Default tracks only main.py to avoid hashing installed dependencies. | `list(string)` | <pre>[<br/>  "main.py"<br/>]</pre> | no |
 | <a name="input_tags"></a> [tags](#input\_tags) | Map of tags to assign to resources | `map(string)` | `{}` | no |
 | <a name="input_timeout"></a> [timeout](#input\_timeout) | Lambda function timeout in seconds | `number` | `60` | no |
 
@@ -414,3 +452,4 @@ Apache 2.0
 | <a name="output_throttle_alarm_arn"></a> [throttle\_alarm\_arn](#output\_throttle\_alarm\_arn) | ARN of the throttle CloudWatch alarm (if enabled) |
 | <a name="output_vpc_config_security_group_ids"></a> [vpc\_config\_security\_group\_ids](#output\_vpc\_config\_security\_group\_ids) | List of security group IDs for Lambda VPC configuration (if configured) |
 | <a name="output_vpc_config_subnet_ids"></a> [vpc\_config\_subnet\_ids](#output\_vpc\_config\_subnet\_ids) | List of subnet IDs for Lambda VPC configuration (if configured) |
+<!-- END_TF_DOCS -->
