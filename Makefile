@@ -127,8 +127,8 @@ define do_release
 	case "$$REPLY" in \
 		[Yy]|[Yy][Ee][Ss]) \
 			DATE=$$(date +%Y-%m-%d); \
-			sed -i "s/## \[Unreleased\]/## [$$NEW_VERSION] - $$DATE/" CHANGELOG.md; \
-			sed -i "8i\\\n## [Unreleased]" CHANGELOG.md; \
+			sed -i '' "s/## \[Unreleased\]/## [$$NEW_VERSION] - $$DATE/" CHANGELOG.md; \
+			sed -i '' "8i\\\n## [Unreleased]" CHANGELOG.md; \
 			git add CHANGELOG.md; \
 			git commit -a -m "Record release $$NEW_VERSION in CHANGELOG.md"; \
 			bumpversion --new-version $$NEW_VERSION patch; \
