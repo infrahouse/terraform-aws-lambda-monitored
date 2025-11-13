@@ -18,11 +18,11 @@ module "lambda_bucket" {
 # Upload Lambda package to S3
 resource "aws_s3_object" "lambda_package" {
   bucket = module.lambda_bucket.bucket_name
-  key    = "${var.function_name}/${data.archive_file.lambda_source_hash.output_md5}.zip"
-  source = data.archive_file.lambda_source_hash.output_path
+  key    = "${var.function_name}/${local.package_hash}.zip"
+  source = local.zip_output_path
 
   depends_on = [
-    null_resource.install_python_dependencies
+    null_resource.lambda_package
   ]
 
   tags = local.tags
@@ -33,7 +33,7 @@ resource "aws_s3_object" "lambda_package" {
       "${path.module}/scripts/wait_for_s3_object.sh",
       {
         bucket_name       = module.lambda_bucket.bucket_name
-        object_key        = "${var.function_name}/${data.archive_file.lambda_source_hash.output_md5}.zip"
+        object_key        = "${var.function_name}/${local.package_hash}.zip"
         caller_account_id = data.aws_caller_identity.current.account_id
         caller_arn        = data.aws_caller_identity.current.arn
       }

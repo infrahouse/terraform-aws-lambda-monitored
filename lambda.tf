@@ -12,7 +12,7 @@ resource "aws_lambda_function" "this" {
   s3_bucket = aws_s3_object.lambda_package.bucket
   s3_key    = aws_s3_object.lambda_package.key
 
-  source_code_hash = data.archive_file.lambda_source_hash.output_base64sha256
+  source_code_hash = local.source_code_hash
 
   dynamic "environment" {
     for_each = length(var.environment_variables) > 0 ? [1] : []

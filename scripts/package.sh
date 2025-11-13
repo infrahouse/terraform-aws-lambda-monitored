@@ -2,12 +2,13 @@
 #
 # Package Lambda function with dependencies for specified architecture
 #
-# Usage: package.sh <source_dir> <requirements_file> <output_dir> <architecture> <python_version>
+# Usage: package.sh <source_dir> <requirements_file> <build_dir> <zip_output> <architecture> <python_version>
 #
 # Arguments:
 #   source_dir        - Directory containing Lambda function source code
 #   requirements_file - Path to requirements.txt (optional, use "none" to skip)
-#   output_dir        - Output directory path for prepared package
+#   build_dir         - Build directory path for prepared package
+#   zip_output        - Output path for the zip file
 #   architecture      - Target architecture: x86_64 or arm64
 #   python_version    - Python version (e.g., python3.12)
 #
@@ -17,9 +18,10 @@ set -euo pipefail
 # Parse arguments
 SOURCE_DIR="${1:?Source directory required}"
 REQUIREMENTS_FILE="${2:-none}"
-OUTPUT_DIR="${3:?Output directory required}"
-ARCHITECTURE="${4:-x86_64}"
-PYTHON_VERSION="${5:-python3.12}"
+BUILD_DIR="${3:?Build directory required}"
+ZIP_OUTPUT="${4:?Zip output path required}"
+ARCHITECTURE="${5:-x86_64}"
+PYTHON_VERSION="${6:-python3.12}"
 
 # Extract Python version number (e.g., python3.12 -> 3.12)
 PY_VER="${PYTHON_VERSION#python}"
@@ -90,37 +92,31 @@ esac
 echo "Preparing Lambda package:"
 echo "  Source: ${SOURCE_DIR}"
 echo "  Requirements: ${REQUIREMENTS_FILE}"
-echo "  Output: ${OUTPUT_DIR}"
+echo "  Build: ${BUILD_DIR}"
+echo "  Zip: ${ZIP_OUTPUT}"
 echo "  Architecture: ${ARCH} (${PLATFORM})"
 echo "  Python: ${PYTHON_VERSION} (${PY_VER})"
 
-# Get absolute paths for comparison (before creating output dir)
+# Get absolute paths for comparison (before creating build dir)
 SOURCE_ABS=$(cd "${SOURCE_DIR}" && pwd)
 
-# Normalize OUTPUT_DIR to absolute path
-if [ -d "${OUTPUT_DIR}" ]; then
-    OUTPUT_ABS=$(cd "${OUTPUT_DIR}" && pwd)
-else
-    # If output dir doesn't exist, resolve it relative to current directory
-    OUTPUT_ABS=$(mkdir -p "${OUTPUT_DIR}" && cd "${OUTPUT_DIR}" && pwd)
-fi
+# Create build directory if it doesn't exist
+mkdir -p "${BUILD_DIR}"
 
-# Only clean and copy if source and output are different directories
-if [ "${SOURCE_ABS}" = "${OUTPUT_ABS}" ]; then
-    echo "Source and output directories are the same, building in place..."
-else
-    # Clean output directory if it exists
-    if [ -d "${OUTPUT_DIR}" ]; then
-        echo "Cleaning existing output directory..."
-        rm -rf "${OUTPUT_DIR:?}"/*
-    else
-        # Create output directory if it doesn't exist
-        mkdir -p "${OUTPUT_DIR}"
-    fi
+# Normalize BUILD_DIR to absolute path
+BUILD_ABS=$(cd "${BUILD_DIR}" && pwd)
 
-    # Copy source files to output directory
+# Only clean and copy if source and build are different directories
+if [ "${SOURCE_ABS}" = "${BUILD_ABS}" ]; then
+    echo "Source and build directories are the same, building in place..."
+else
+    # Clean build directory
+    echo "Cleaning existing build directory..."
+    rm -rf "${BUILD_DIR:?}"/*
+
+    # Copy source files to build directory
     echo "Copying source files..."
-    cp -r "${SOURCE_DIR}"/* "${OUTPUT_DIR}/"
+    cp -r "${SOURCE_DIR}"/* "${BUILD_DIR}/"
 fi
 
 # Install dependencies if requirements file exists and is not "none"
@@ -133,7 +129,7 @@ if [[ "${REQUIREMENTS_FILE}" != "none" ]] && [[ -f "${REQUIREMENTS_FILE}" ]]; th
         --platform "${PLATFORM}" \
         --implementation cp \
         --python-version "${PY_VER}" \
-        --target "${OUTPUT_DIR}" \
+        --target "${BUILD_DIR}" \
         --upgrade \
         -r "${REQUIREMENTS_FILE}"
 
@@ -144,8 +140,19 @@ fi
 
 # Clean up Python cache files
 echo "Cleaning up Python cache files..."
-find "${OUTPUT_DIR}" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
-find "${OUTPUT_DIR}" -type f -name "*.pyc" -delete 2>/dev/null || true
-find "${OUTPUT_DIR}" -type f -name "*.pyo" -delete 2>/dev/null || true
+find "${BUILD_DIR}" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+find "${BUILD_DIR}" -type f -name "*.pyc" -delete 2>/dev/null || true
+find "${BUILD_DIR}" -type f -name "*.pyo" -delete 2>/dev/null || true
 
-echo "Package prepared successfully: ${OUTPUT_DIR}"
+# Create zip file
+echo "Creating zip file..."
+ZIP_DIR=$(dirname "${ZIP_OUTPUT}")
+mkdir -p "${ZIP_DIR}"
+
+# Convert ZIP_OUTPUT to absolute path before cd'ing into build directory
+ZIP_OUTPUT_ABS=$(cd "${ZIP_DIR}" && pwd)/$(basename "${ZIP_OUTPUT}")
+
+# Create zip from build directory
+(cd "${BUILD_DIR}" && zip -q -r "${ZIP_OUTPUT_ABS}" .)
+
+echo "✓ Package created successfully: ${ZIP_OUTPUT_ABS}"
