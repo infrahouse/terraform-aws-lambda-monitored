@@ -6,7 +6,7 @@ module "lambda_bucket" {
   source  = "registry.infrahouse.com/infrahouse/s3-bucket/aws"
   version = "0.2.0"
 
-  bucket_prefix = substr("${var.function_name}-lambda", 0, 37)
+  bucket_prefix = substr("${local.sanitized_function_name}-lambda", 0, 37)
   tags = merge(
     local.tags,
     {
