@@ -188,6 +188,9 @@ def create_terraform_config(
           lambda_security_group_ids = {json.dumps(security_group_ids)}
         """
 
+    # Convert path to forward slashes for Terraform (Windows compatibility)
+    lambda_source_dir_normalized = str(lambda_source_dir).replace('\\', '/')
+
     main_tf = dedent(
         f'''
         {sg_resource}
@@ -195,7 +198,7 @@ def create_terraform_config(
           source = "./.."  # Points to the root module
 
           function_name     = "{function_name}"
-          lambda_source_dir = "{str(lambda_source_dir).replace('\\', '/')}"
+          lambda_source_dir = "{lambda_source_dir_normalized}"
           python_version    = "{python_version}"
           architecture      = "{architecture}"
           alert_strategy    = "{alert_strategy}"

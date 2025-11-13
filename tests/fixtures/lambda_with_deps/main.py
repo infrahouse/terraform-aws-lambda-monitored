@@ -13,37 +13,59 @@ def lambda_handler(event, context):
     """
     Handle Lambda invocation with HTTP request to external API.
 
-    Makes a test HTTP request to httpbin.org to verify that the requests
-    library is properly packaged with platform-specific wheels.
+    Makes a test HTTP request to verify that the requests library is properly
+    packaged with platform-specific wheels. Tries multiple HTTP testing endpoints
+    for resilience against service outages.
 
     :param dict event: Lambda event object containing request data
     :param LambdaContext context: Lambda context object with runtime information
     :return: Response dictionary with status code and API response
     :rtype: dict
-    :raises requests.RequestException: If HTTP request fails
 
     :Example:
 
     >>> lambda_handler({}, None)  # doctest: +SKIP
     {'statusCode': 200, 'body': '{"success": true, "requests_version": "2.31.0"}'}
     """
-    try:
-        # Make a simple GET request to verify requests library works
-        response = requests.get("https://httpbin.org/get", timeout=5)
-        response.raise_for_status()
+    # List of HTTP testing endpoints to try (for resilience)
+    endpoints = [
+        "https://httpbin.org/get",
+        "https://httpbun.com/get",
+    ]
 
-        return {
-            "statusCode": 200,
-            "body": json.dumps(
-                {
-                    "success": True,
-                    "requests_version": requests.__version__,
-                    "status_code": response.status_code,
-                }
-            ),
-        }
-    except requests.RequestException as e:
-        return {
-            "statusCode": 500,
-            "body": json.dumps({"success": False, "error": str(e)}),
-        }
+    errors = []
+
+    # Try each endpoint until one succeeds
+    for endpoint in endpoints:
+        try:
+            response = requests.get(endpoint, timeout=5)
+            response.raise_for_status()
+
+            # Success! Return immediately
+            return {
+                "statusCode": 200,
+                "body": json.dumps(
+                    {
+                        "success": True,
+                        "requests_version": requests.__version__,
+                        "endpoint_used": endpoint,
+                        "status_code": response.status_code,
+                    }
+                ),
+            }
+        except requests.RequestException as e:
+            # Record error and try next endpoint
+            errors.append({"endpoint": endpoint, "error": str(e)})
+            continue
+
+    # All endpoints failed
+    return {
+        "statusCode": 500,
+        "body": json.dumps(
+            {
+                "success": False,
+                "error": "All HTTP test endpoints failed",
+                "attempts": errors,
+            }
+        ),
+    }
