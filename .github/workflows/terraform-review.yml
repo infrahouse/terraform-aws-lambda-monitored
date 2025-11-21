@@ -22,9 +22,13 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Create reviews directory
+        run: mkdir -p .claude/reviews
+
       - name: Run Terraform Module Review
         run: |
           npx @anthropic-ai/claude-code --print --output-format json \
+            --dangerously-skip-permissions \
             "Launch the terraform-module-reviewer agent to review this module" \
             > claude-output.json
         env:
