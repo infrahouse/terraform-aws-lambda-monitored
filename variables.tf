@@ -205,7 +205,7 @@ variable "duration_threshold_percent" {
   default     = null
 
   validation {
-    condition     = var.duration_threshold_percent == null || (var.duration_threshold_percent > 0 && var.duration_threshold_percent <= 100)
+    condition     = var.duration_threshold_percent == null ? true : (var.duration_threshold_percent > 0 && var.duration_threshold_percent <= 100)
     error_message = "Duration threshold percent must be between 1 and 100"
   }
 }

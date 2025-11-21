@@ -1,12 +1,22 @@
 locals {
   module         = "infrahouse/lambda-monitored/aws"
-  module_version = "1.0.0"
+  module_version = "1.0.4"
 
   default_module_tags = {
     created_by_module = local.module
   }
 
   tags = merge(var.tags, local.default_module_tags)
+
+  # Sanitize function name for S3 bucket (S3 only allows lowercase alphanumeric and hyphens)
+  # Original function name is preserved in tags
+  sanitized_function_name = lower(
+    replace(
+      replace(var.function_name, "_", "-"),
+      "/[^a-z0-9-]/",
+      ""
+    )
+  )
 
   # Auto-detect requirements.txt in lambda_source_dir if not explicitly specified
   requirements_txt_path = "${var.lambda_source_dir}/requirements.txt"

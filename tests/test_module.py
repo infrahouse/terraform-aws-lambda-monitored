@@ -241,7 +241,7 @@ class TestLambdaWithDependencies:
 
             # Parse response
             payload = json.loads(response["Payload"].read())
-            assert payload["statusCode"] == 200
+            assert payload["statusCode"] == 200, f"Status code != 200 in payload: {payload}"
 
             # Verify requests library worked
             body = json.loads(payload["body"])
