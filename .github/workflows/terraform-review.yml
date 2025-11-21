@@ -22,15 +22,9 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install Claude Code
-        run: npm install -g @anthropic-ai/claude-code
-
-      - name: Add npm global bin to PATH
-        run: echo "$(npm config get prefix)/bin" >> $GITHUB_PATH
-
       - name: Run Terraform Module Review
         run: |
-          claude-code --print --output-format json \
+          npx @anthropic-ai/claude-code --print --output-format json \
             "Launch the terraform-module-reviewer agent to review this module" \
             > claude-output.json
         env:
