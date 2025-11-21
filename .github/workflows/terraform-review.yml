@@ -1,0 +1,80 @@
+name: Terraform Module Review
+
+on:
+  pull_request:
+    paths:
+      - '**.tf'
+      - '.github/workflows/terraform-review.yml'
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Run Terraform Module Review
+        run: |
+          claude-code --print --output-format json \
+            "Launch the terraform-module-reviewer agent to review this module" \
+            > claude-output.json
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+      - name: Check if review file exists
+        id: check_review
+        run: |
+          if [ -f ".claude/reviews/terraform-module-review.md" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "Review file created successfully"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "Warning: Review file not found"
+          fi
+
+      - name: Upload Review as Artifact
+        if: steps.check_review.outputs.exists == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-review
+          path: .claude/reviews/terraform-module-review.md
+
+      - name: Upload Claude Output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: claude-output
+          path: claude-output.json
+
+      - name: Post Review as PR Comment
+        if: steps.check_review.outputs.exists == 'true' && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const reviewContent = fs.readFileSync('.claude/reviews/terraform-module-review.md', 'utf8');
+
+            // Truncate if too long for GitHub comment (65536 char limit)
+            const maxLength = 65000;
+            const content = reviewContent.length > maxLength
+              ? reviewContent.substring(0, maxLength) + '\n\n... (truncated)'
+              : reviewContent;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## 🤖 Terraform Module Review\n\n${content}`
+            });
