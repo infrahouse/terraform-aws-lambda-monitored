@@ -2,9 +2,6 @@ name: Terraform Module Review
 
 on:
   pull_request:
-    paths:
-      - '**.tf'
-      - '.github/workflows/terraform-review.yml'
 
 jobs:
   review:
@@ -27,6 +24,25 @@ jobs:
       - name: Create reviews directory
         run: mkdir -p .claude/reviews
 
+      - name: Download previous review artifact
+        id: download_previous
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: terraform-review-pr-${{ github.event.pull_request.number }}
+          path: .claude/previous-review/
+
+      - name: Check for previous review
+        id: check_previous
+        run: |
+          if [ -f ".claude/previous-review/terraform-module-review.md" ]; then
+            echo "has_previous=true" >> $GITHUB_OUTPUT
+            echo "Previous review found"
+          else
+            echo "has_previous=false" >> $GITHUB_OUTPUT
+            echo "No previous review found - this is the first review"
+          fi
+
       - name: Get PR diff
         id: diff
         run: |
@@ -36,11 +52,27 @@ jobs:
           echo "Changes in this PR:"
           cat pr-changes.diff
 
-      - name: Run Terraform Module Review
+      - name: Run Terraform Module Review (First Review)
+        if: steps.check_previous.outputs.has_previous == 'false'
         run: |
           npx @anthropic-ai/claude-code --print --output-format json \
             --dangerously-skip-permissions \
             "Launch the terraform-module-reviewer agent. Review all changes in pr-changes.diff file. Focus your review on the changes made in this PR while considering the overall module context. Analyze what was added, modified, or removed, and assess the impact on the module's security, functionality, and best practices compliance." \
+            > claude-output.json
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+      - name: Run Terraform Module Review (Follow-up Review)
+        if: steps.check_previous.outputs.has_previous == 'true'
+        run: |
+          npx @anthropic-ai/claude-code --print --output-format json \
+            --dangerously-skip-permissions \
+            "Launch the terraform-module-reviewer agent. This is a follow-up review. Read the previous review from .claude/previous-review/terraform-module-review.md and the current changes in pr-changes.diff. Compare the previous findings with the current state:
+            - Mark issues as '✅ FIXED:' if they have been resolved
+            - Mark issues as '⚠️ STILL PRESENT:' if they remain unaddressed
+            - Mark new issues as '🆕 NEW:' if they appear for the first time
+            - Provide a summary at the top showing progress (e.g., '3 issues fixed, 1 still present, 2 new issues found')
+            Focus on showing what has improved and what still needs attention." \
             > claude-output.json
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -56,11 +88,19 @@ jobs:
             echo "Warning: Review file not found"
           fi
 
-      - name: Upload Review as Artifact
+      - name: Upload Review as Artifact (for next run)
         if: steps.check_review.outputs.exists == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: terraform-review
+          name: terraform-review-pr-${{ github.event.pull_request.number }}
+          path: .claude/reviews/terraform-module-review.md
+          overwrite: true
+
+      - name: Upload Review as Artifact (downloadable)
+        if: steps.check_review.outputs.exists == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-review-latest
           path: .claude/reviews/terraform-module-review.md
 
       - name: Upload Claude Output
@@ -84,9 +124,35 @@ jobs:
               ? reviewContent.substring(0, maxLength) + '\n\n... (truncated)'
               : reviewContent;
 
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
+            const body = `## 🤖 Terraform Module Review\n\n${content}\n\n<!-- terraform-review-bot -->`;
+
+            // Find existing comment
+            const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `## 🤖 Terraform Module Review\n\n${content}`
+              issue_number: context.issue.number,
             });
+
+            const botComment = comments.find(comment =>
+              comment.body.includes('<!-- terraform-review-bot -->')
+            );
+
+            if (botComment) {
+              // Update existing comment
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: body
+              });
+              console.log('Updated existing review comment');
+            } else {
+              // Create new comment
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: body
+              });
+              console.log('Created new review comment');
+            }
