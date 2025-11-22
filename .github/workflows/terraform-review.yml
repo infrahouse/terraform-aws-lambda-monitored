@@ -16,6 +16,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch full history for proper diff
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -30,15 +32,15 @@ jobs:
         run: |
           # Get the diff between base and head
           git fetch origin ${{ github.event.pull_request.base.ref }}
-          git diff origin/${{ github.event.pull_request.base.ref }}...HEAD -- '*.tf' > pr-changes.diff
-          echo "Terraform changes in this PR:"
+          git diff origin/${{ github.event.pull_request.base.ref }}...HEAD > pr-changes.diff
+          echo "Changes in this PR:"
           cat pr-changes.diff
 
       - name: Run Terraform Module Review
         run: |
           npx @anthropic-ai/claude-code --print --output-format json \
             --dangerously-skip-permissions \
-            "Launch the terraform-module-reviewer agent. Review the Terraform changes in pr-changes.diff file. Focus your review on the changes made in this PR while considering the overall module context. Analyze what was added, modified, or removed, and assess the impact on the module's security, functionality, and best practices compliance." \
+            "Launch the terraform-module-reviewer agent. Review all changes in pr-changes.diff file. Focus your review on the changes made in this PR while considering the overall module context. Analyze what was added, modified, or removed, and assess the impact on the module's security, functionality, and best practices compliance." \
             > claude-output.json
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
