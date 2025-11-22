@@ -12,7 +12,8 @@
       "Bash(terraform init:*)",
       "Bash(terraform validate:*)",
       "Bash(terraform-docs:*)",
-      "Bash(make lint:*)"
+      "Bash(make lint:*)",
+      "WebFetch(domain:code.claude.com)"
     ],
     "deny": [],
     "ask": []
