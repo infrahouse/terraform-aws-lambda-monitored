@@ -3,9 +3,14 @@ name: Terraform Module Review
 on:
   pull_request:
 
+concurrency:
+  group: terraform-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   review:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: read
       pull-requests: write
