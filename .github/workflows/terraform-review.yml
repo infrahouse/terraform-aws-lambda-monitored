@@ -27,15 +27,41 @@ jobs:
           node-version: '20'
 
       - name: Create reviews directory
-        run: mkdir -p .claude/reviews
+        run: mkdir -p .claude/reviews .claude/previous-review
 
-      - name: Download previous review artifact
+      - name: Download previous review from PR comment
         id: download_previous
-        uses: actions/download-artifact@v4
-        continue-on-error: true
+        uses: actions/github-script@v7
         with:
-          name: terraform-review-pr-${{ github.event.pull_request.number }}
-          path: .claude/previous-review/
+          script: |
+            const fs = require('fs');
+
+            // Find existing comment with review
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const botComment = comments.find(comment =>
+              comment.body.includes('<!-- terraform-review-bot -->')
+            );
+
+            if (botComment) {
+              // Extract review content (remove header and marker)
+              const body = botComment.body;
+              const reviewStart = body.indexOf('\n\n') + 2; // Skip "## 🤖 Terraform Module Review\n\n"
+              const reviewEnd = body.lastIndexOf('\n\n<!-- terraform-review-bot -->');
+              const reviewContent = body.substring(reviewStart, reviewEnd);
+
+              // Save to file
+              fs.writeFileSync('.claude/previous-review/terraform-module-review.md', reviewContent);
+              console.log('Previous review extracted from PR comment');
+              return { has_previous: true };
+            } else {
+              console.log('No previous review found - this is the first review');
+              return { has_previous: false };
+            }
 
       - name: Check for previous review
         id: check_previous
@@ -92,21 +118,6 @@ jobs:
             echo "exists=false" >> $GITHUB_OUTPUT
             echo "Warning: Review file not found"
           fi
-
-      - name: Upload Review as Artifact (for next run)
-        if: steps.check_review.outputs.exists == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: terraform-review-pr-${{ github.event.pull_request.number }}
-          path: .claude/reviews/terraform-module-review.md
-          overwrite: true
-
-      - name: Upload Review as Artifact (downloadable)
-        if: steps.check_review.outputs.exists == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: terraform-review-latest
-          path: .claude/reviews/terraform-module-review.md
 
       - name: Upload Claude Output
         if: always()
