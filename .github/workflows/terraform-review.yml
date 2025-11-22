@@ -1,6 +1,7 @@
+---
 name: Terraform Module Review
 
-on:
+on:  # yamllint disable-line rule:truthy
   pull_request:
 
 concurrency:
@@ -88,7 +89,13 @@ jobs:
         run: |
           npx @anthropic-ai/claude-code --print --output-format json \
             --dangerously-skip-permissions \
-            "Launch the terraform-module-reviewer agent. Review all changes in pr-changes.diff file. Focus your review on the changes made in this PR while considering the overall module context. Analyze what was added, modified, or removed, and assess the impact on the module's security, functionality, and best practices compliance." \
+            "Launch the terraform-module-reviewer agent. \
+          Review all changes in pr-changes.diff file. \
+          Focus your review on the changes made in this PR while \
+          considering the overall module context. \
+          Analyze what was added, modified, or removed, and assess \
+          the impact on the module's security, functionality, and \
+          best practices compliance." \
             > claude-output.json
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -98,12 +105,20 @@ jobs:
         run: |
           npx @anthropic-ai/claude-code --print --output-format json \
             --dangerously-skip-permissions \
-            "Launch the terraform-module-reviewer agent. This is a follow-up review. Read the previous review from .claude/previous-review/terraform-module-review.md and the current changes in pr-changes.diff. Compare the previous findings with the current state:
+            "Launch the terraform-module-reviewer agent. \
+          This is a follow-up review. \
+          Read the previous review from \
+          .claude/previous-review/terraform-module-review.md and the \
+          current changes in pr-changes.diff. \
+          Compare the previous findings with the current state:
             - Mark issues as '✅ FIXED:' if they have been resolved
-            - Mark issues as '⚠️ STILL PRESENT:' if they remain unaddressed
-            - Mark new issues as '🆕 NEW:' if they appear for the first time
-            - Provide a summary at the top showing progress (e.g., '3 issues fixed, 1 still present, 2 new issues found')
-            Focus on showing what has improved and what still needs attention." \
+            - Mark issues as '⚠️ STILL PRESENT:' if unaddressed
+            - Mark new issues as '🆕 NEW:' if they appear for the \
+          first time
+            - Provide a summary at the top showing progress \
+          (e.g., '3 issues fixed, 1 still present, 2 new issues found')
+            Focus on showing what has improved and what still needs \
+          attention." \
             > claude-output.json
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
