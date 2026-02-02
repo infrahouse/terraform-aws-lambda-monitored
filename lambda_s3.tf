@@ -4,7 +4,7 @@ data "aws_caller_identity" "current" {}
 # S3 bucket for Lambda deployment packages
 module "lambda_bucket" {
   source  = "registry.infrahouse.com/infrahouse/s3-bucket/aws"
-  version = "0.2.0"
+  version = "0.3.1"
 
   bucket_prefix = substr("${local.sanitized_function_name}-lambda", 0, 37)
   tags = merge(
