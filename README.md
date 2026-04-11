@@ -1,14 +1,43 @@
 # terraform-aws-lambda-monitored
 
-[![InfraHouse](https://img.shields.io/badge/InfraHouse-Terraform_Module-blue?logo=terraform)](https://registry.terraform.io/modules/infrahouse/lambda-monitored/aws/latest)
-[![License](https://img.shields.io/github/license/infrahouse/terraform-aws-lambda-monitored)](LICENSE)
-[![CI](https://github.com/infrahouse/terraform-aws-lambda-monitored/actions/workflows/terraform-CI.yml/badge.svg)](https://github.com/infrahouse/terraform-aws-lambda-monitored/actions/workflows/terraform-CI.yml)
+[![Need Help?](https://img.shields.io/badge/Need%20Help%3F-Contact%20Us-0066CC)](https://infrahouse.com/contact)
+[![Docs](https://img.shields.io/badge/docs-github.io-blue)](https://infrahouse.github.io/terraform-aws-lambda-monitored/)
+[![Registry](https://img.shields.io/badge/Terraform-Registry-purple?logo=terraform)](https://registry.terraform.io/modules/infrahouse/lambda-monitored/aws/latest)
+[![Release](https://img.shields.io/github/release/infrahouse/terraform-aws-lambda-monitored.svg)](https://github.com/infrahouse/terraform-aws-lambda-monitored/releases/latest)
 [![AWS Lambda](https://img.shields.io/badge/AWS-Lambda-orange?logo=awslambda)](https://aws.amazon.com/lambda/)
+[![Security](https://img.shields.io/github/actions/workflow/status/infrahouse/terraform-aws-lambda-monitored/vuln-scanner-pr.yml?label=Security)](https://github.com/infrahouse/terraform-aws-lambda-monitored/actions/workflows/vuln-scanner-pr.yml)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 AWS Lambda function module with built-in monitoring and alerting capabilities.
 
 This module creates a Lambda function with CloudWatch Logs, configurable error monitoring, and SNS-based alerting.
 Designed to meet ISO27001 compliance requirements for error rate monitoring.
+
+![Architecture](docs/assets/architecture.svg)
+
+## Why This Module?
+
+Most Lambda Terraform modules ship a function and stop there, leaving you to bolt on logging, alarms, and an
+incident channel yourself. This module treats Lambda as a **production workload from day one** and wires up
+the full monitoring stack so you can pass a compliance audit without follow-up work:
+
+- **Monitoring is not optional.** Every function comes with CloudWatch Logs (encrypted, with retention), plus
+  alarms for errors, throttles, and execution duration — the baseline Vanta and ISO27001 auditors look for.
+- **Two alert strategies, one flag.** Pick `immediate` (fire on any error) for low-traffic or critical paths,
+  or `threshold` (error-rate metric math) for high-volume functions that expect occasional failures.
+- **Alerts go somewhere useful.** SNS topic with email subscriptions is created for you; you can also fan out
+  to existing PagerDuty or Slack topics via `alarm_topic_arns`.
+- **Reproducible packaging.** Dependencies are installed with `--platform manylinux2014_{x86_64,aarch64}` so
+  your local machine's architecture and Python version don't leak into the deployment artifact.
+- **Smart change detection.** The packager hashes your source files plus `requirements.txt` — not the entire
+  `.build/` directory — so re-creating `.terraform` doesn't trigger spurious re-uploads.
+- **Tight IAM by default.** Execution role uses `name_prefix`, logging policy is scoped to the function's log
+  group, and VPC access (when enabled) grants ENI permissions only to the subnets you specified.
+- **Real integration tests.** The test suite applies and destroys real AWS infrastructure across the full
+  matrix of supported AWS providers, architectures, and Python versions — no mocks.
+
+If all you need is "give me a Lambda resource" this module is overkill. If you need a Lambda you can hand to
+a compliance auditor, this is the shortest path.
 
 ## Features
 
@@ -24,6 +53,17 @@ Designed to meet ISO27001 compliance requirements for error rate monitoring.
 - Optional memory utilization alarm backed by Lambda Insights (opt-in)
 - Automatic change detection (re-packages only when code or dependencies change)
 
+## Documentation
+
+Full documentation is published to GitHub Pages:
+<https://infrahouse.github.io/terraform-aws-lambda-monitored/>
+
+- [Getting Started](https://infrahouse.github.io/terraform-aws-lambda-monitored/getting-started/) — prerequisites and first deployment
+- [Architecture](https://infrahouse.github.io/terraform-aws-lambda-monitored/architecture/) — how the module is put together
+- [Configuration](https://infrahouse.github.io/terraform-aws-lambda-monitored/configuration/) — every variable explained
+- [Examples](https://infrahouse.github.io/terraform-aws-lambda-monitored/examples/) — common usage patterns
+- [Troubleshooting](https://infrahouse.github.io/terraform-aws-lambda-monitored/troubleshooting/) — common issues and fixes
+
 ## Prerequisites
 
 The module's packaging script requires the following tools to be installed on the system where Terraform runs:
@@ -32,19 +72,16 @@ The module's packaging script requires the following tools to be installed on th
   - Ubuntu/Debian: `sudo apt-get install python3 python3-pip`
   - macOS: `brew install python3`
   - Amazon Linux: `sudo yum install python3 python3-pip`
-  - Windows: [Download from python.org](https://www.python.org/downloads/)
 
 - **pip3** - For managing Python packages
   - Ubuntu/Debian: `sudo apt-get install python3-pip`
   - macOS: `python3 -m ensurepip`
   - Amazon Linux: `sudo yum install python3-pip`
-  - Windows: `python -m ensurepip`
 
 - **jq** - For parsing JSON responses
   - Ubuntu/Debian: `sudo apt-get install jq`
   - macOS: `brew install jq`
   - Amazon Linux: `sudo yum install jq`
-  - Windows: [Download from stedolan.github.io/jq](https://stedolan.github.io/jq/download/)
 
 The packaging and deployment scripts will check for these dependencies and provide installation instructions if any are missing.
 
@@ -389,9 +426,22 @@ make format              # Format Terraform and Python files
 make clean               # Clean temporary files and test data
 ```
 
+## Examples
+
+Working examples live under [`examples/`](examples):
+
+- [`examples/immediate-alerts`](examples/immediate-alerts) — fire an SNS alarm on the first error
+- [`examples/threshold-alerts`](examples/threshold-alerts) — rate-based error alarm for high-traffic functions
+- [`examples/custom-permissions`](examples/custom-permissions) — attach custom IAM policies for S3/DynamoDB access
+
+## Contributing
+
+Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow and
+[SECURITY.md](SECURITY.md) for how to report vulnerabilities.
+
 ## License
 
-Apache 2.0
+Apache 2.0 — see [LICENSE](LICENSE).
 
 ---
 
@@ -416,7 +466,7 @@ Apache 2.0
 
 | Name | Source | Version |
 |------|--------|---------|
-| <a name="module_lambda_bucket"></a> [lambda\_bucket](#module\_lambda\_bucket) | registry.infrahouse.com/infrahouse/s3-bucket/aws | 0.2.0 |
+| <a name="module_lambda_bucket"></a> [lambda\_bucket](#module\_lambda\_bucket) | registry.infrahouse.com/infrahouse/s3-bucket/aws | 0.3.1 |
 
 ## Resources
 
