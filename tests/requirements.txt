@@ -2,3 +2,5 @@
 infrahouse-core ~= 0.17
 pytest-infrahouse ~= 0.20
 yamllint ~= 1.37
+
+checkov ~= 3.2

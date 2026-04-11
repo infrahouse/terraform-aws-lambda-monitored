@@ -223,7 +223,10 @@ variable "memory_utilization_threshold_percent" {
   default     = null
 
   validation {
-    condition     = var.memory_utilization_threshold_percent == null ? true : (var.memory_utilization_threshold_percent > 0 && var.memory_utilization_threshold_percent <= 100)
+    condition = var.memory_utilization_threshold_percent == null ? true : (
+      var.memory_utilization_threshold_percent > 0
+      && var.memory_utilization_threshold_percent <= 100
+    )
     error_message = "memory_utilization_threshold_percent must be between 1 and 100, or null to disable the alarm"
   }
 }
@@ -240,7 +243,9 @@ variable "lambda_insights_layer_arn" {
   default     = null
 
   validation {
-    condition     = var.lambda_insights_layer_arn == null ? true : can(regex("^arn:aws:lambda:", var.lambda_insights_layer_arn))
+    condition = var.lambda_insights_layer_arn == null ? true : can(
+      regex("^arn:aws:lambda:", var.lambda_insights_layer_arn)
+    )
     error_message = "lambda_insights_layer_arn must be a valid Lambda layer ARN starting with 'arn:aws:lambda:'"
   }
 }
