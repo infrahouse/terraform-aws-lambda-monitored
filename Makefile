@@ -38,7 +38,7 @@ install-hooks:  ## Install repo hooks
 	@chmod +x .git/hooks/pre-commit
 
 .PHONY: test
-test: test-simple test-deps test-monitoring test-sns test-vpc ## Run all tests (use TEST_SELECTOR to filter, KEEP_AFTER=1 to preserve resources)
+test: test-simple test-deps test-monitoring test-memory test-sns test-vpc ## Run all tests (use TEST_SELECTOR to filter, KEEP_AFTER=1 to preserve resources)
 	@echo "All tests are done"
 
 .PHONY: test-simple
@@ -52,6 +52,10 @@ test-deps:  ## Run dependency packaging tests (use TEST_SELECTOR to filter)
 .PHONY: test-monitoring
 test-monitoring:  ## Run error monitoring tests (use TEST_SELECTOR to filter)
 	$(call run_pytest,TestErrorMonitoring,tests/test_module.py)
+
+.PHONY: test-memory
+test-memory:  ## Run memory utilization monitoring tests (use TEST_SELECTOR to filter)
+	$(call run_pytest,TestMemoryMonitoring,tests/test_module.py)
 
 .PHONY: test-sns
 test-sns:  ## Run SNS integration tests (use TEST_SELECTOR to filter)

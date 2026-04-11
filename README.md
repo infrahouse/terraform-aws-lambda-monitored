@@ -21,6 +21,7 @@ Designed to meet ISO27001 compliance requirements for error rate monitoring.
 - Error monitoring and alerting with SNS email notifications
 - Configurable alert strategies (immediate or threshold-based)
 - Throttle monitoring and alerts
+- Optional memory utilization alarm backed by Lambda Insights (opt-in)
 - Automatic change detection (re-packages only when code or dependencies change)
 
 ## Prerequisites
@@ -51,7 +52,7 @@ The packaging and deployment scripts will check for these dependencies and provi
 
 ```hcl
 module "lambda" {
-  source  = "infrahouse/lambda-monitored/aws"
+  source  = "registry.infrahouse.com/infrahouse/lambda-monitored/aws"
   version = "1.0.4"
 
   function_name     = "my-lambda-function"
@@ -86,6 +87,10 @@ module "lambda" {
   error_rate_threshold           = 5.0  # 5% error rate
   error_rate_evaluation_periods  = 2
   error_rate_datapoints_to_alarm = 2
+
+  # Optional: Memory utilization alarm (enables Lambda Insights when set).
+  # Leave unset (null) to skip Lambda Insights and avoid the extra cost.
+  memory_utilization_threshold_percent = 80
 
   # Optional: CloudWatch Logs retention
   cloudwatch_log_retention_days = 365
@@ -123,7 +128,7 @@ The module uses an intelligent packaging system that automatically handles Pytho
 **With Dependencies:**
 ```hcl
 module "lambda" {
-  source  = "infrahouse/lambda-monitored/aws"
+  source  = "registry.infrahouse.com/infrahouse/lambda-monitored/aws"
   version = "1.0.4"
 
   function_name      = "my-function"
@@ -148,7 +153,7 @@ The module tracks changes to your source code to determine when to rebuild. By d
 ```hcl
 # Default - tracks only main.py
 module "lambda" {
-  source            = "infrahouse/lambda-monitored/aws"
+  source            = "registry.infrahouse.com/infrahouse/lambda-monitored/aws"
   lambda_source_dir = "${path.module}/lambda"
   # source_code_files defaults to ["main.py"]
   ...
@@ -156,7 +161,7 @@ module "lambda" {
 
 # Track multiple specific files
 module "lambda" {
-  source            = "infrahouse/lambda-monitored/aws"
+  source            = "registry.infrahouse.com/infrahouse/lambda-monitored/aws"
   lambda_source_dir = "${path.module}/lambda"
   source_code_files = ["main.py", "utils.py", "config.py"]
   ...
@@ -164,7 +169,7 @@ module "lambda" {
 
 # Track all root-level .py files (useful if you have multiple source files)
 module "lambda" {
-  source            = "infrahouse/lambda-monitored/aws"
+  source            = "registry.infrahouse.com/infrahouse/lambda-monitored/aws"
   lambda_source_dir = "${path.module}/lambda"
   source_code_files = ["*.py"]
   ...
@@ -185,7 +190,7 @@ Lambda functions can be attached to a VPC to access resources in private subnets
 **With VPC Configuration:**
 ```hcl
 module "lambda" {
-  source  = "infrahouse/lambda-monitored/aws"
+  source  = "registry.infrahouse.com/infrahouse/lambda-monitored/aws"
   version = "1.0.4"
 
   function_name     = "my-vpc-function"
@@ -227,6 +232,51 @@ module "lambda" {
 - ❌ Public API calls only (no VPC needed, better performance)
 - ❌ Pure compute functions with no external connections
 - ❌ Functions requiring minimal cold start latency
+
+## Memory Monitoring (Optional)
+
+Memory utilization alerting is **opt-in**. It is disabled by default because it requires enabling
+[AWS Lambda Insights](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Lambda-Insights.html),
+which ships an extension layer with the function and publishes CloudWatch metrics at an additional cost.
+
+**Enable it by setting `memory_utilization_threshold_percent`:**
+
+```hcl
+module "lambda" {
+  source  = "registry.infrahouse.com/infrahouse/lambda-monitored/aws"
+  version = "1.0.4"
+
+  function_name     = "my-lambda-function"
+  lambda_source_dir = "${path.module}/lambda"
+  alarm_emails      = ["team@example.com"]
+
+  # Alarm when memory usage exceeds 80% of memory_size for a single invocation.
+  memory_utilization_threshold_percent = 80
+}
+```
+
+**What happens when it's enabled:**
+
+1. The module attaches the AWS-managed Lambda Insights extension layer to the function. The layer
+   ARN is region- and architecture-specific; the module picks the correct one automatically from
+   `var.architecture`. Override with `lambda_insights_layer_arn` if you need to pin a different
+   version.
+2. The `CloudWatchLambdaInsightsExecutionRolePolicy` managed policy is attached to the Lambda
+   execution role so the extension can publish metrics.
+3. A CloudWatch alarm (`<function_name>-memory`) is created on the
+   `LambdaInsights / memory_utilization` metric (`Maximum` statistic, 1-minute period). Alarms fan
+   out to the same SNS topics as the other alarms in this module.
+
+**What happens when it's disabled (default):**
+
+- No Lambda Insights layer is attached.
+- No managed policy is attached.
+- No memory alarm is created.
+- No additional CloudWatch/Insights charges from this module.
+
+**Threshold semantics:** `memory_utilization_threshold_percent` is a percentage of the function's
+allocated `memory_size`. For example, setting it to `80` on a function with `memory_size = 256`
+triggers the alarm when any invocation uses more than ~205 MB.
 
 ## Notes
 
@@ -360,9 +410,8 @@ Apache 2.0
 
 | Name | Version |
 |------|---------|
-| <a name="provider_archive"></a> [archive](#provider\_archive) | ~> 2.0 |
-| <a name="provider_aws"></a> [aws](#provider\_aws) | >= 5.31, < 7.0 |
-| <a name="provider_null"></a> [null](#provider\_null) | ~> 3.0 |
+| <a name="provider_aws"></a> [aws](#provider\_aws) | 6.20.0 |
+| <a name="provider_null"></a> [null](#provider\_null) | 3.2.4 |
 
 ## Modules
 
@@ -378,18 +427,19 @@ Apache 2.0
 | [aws_cloudwatch_metric_alarm.duration](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudwatch_metric_alarm) | resource |
 | [aws_cloudwatch_metric_alarm.errors_immediate](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudwatch_metric_alarm) | resource |
 | [aws_cloudwatch_metric_alarm.errors_threshold](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudwatch_metric_alarm) | resource |
+| [aws_cloudwatch_metric_alarm.memory](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudwatch_metric_alarm) | resource |
 | [aws_cloudwatch_metric_alarm.throttles](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudwatch_metric_alarm) | resource |
 | [aws_iam_role.lambda](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role) | resource |
 | [aws_iam_role_policy.lambda_logging](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy) | resource |
 | [aws_iam_role_policy.lambda_vpc_access](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy) | resource |
 | [aws_iam_role_policy_attachment.additional](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy_attachment) | resource |
+| [aws_iam_role_policy_attachment.lambda_insights](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy_attachment) | resource |
 | [aws_lambda_function.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/lambda_function) | resource |
 | [aws_lambda_function_event_invoke_config.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/lambda_function_event_invoke_config) | resource |
 | [aws_s3_object.lambda_package](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/s3_object) | resource |
 | [aws_sns_topic.alarms](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/sns_topic) | resource |
 | [aws_sns_topic_subscription.alarm_emails](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/sns_topic_subscription) | resource |
-| [null_resource.install_python_dependencies](https://registry.terraform.io/providers/hashicorp/null/latest/docs/resources/resource) | resource |
-| [archive_file.lambda_source_hash](https://registry.terraform.io/providers/hashicorp/archive/latest/docs/data-sources/file) | data source |
+| [null_resource.lambda_package](https://registry.terraform.io/providers/hashicorp/null/latest/docs/resources/resource) | resource |
 | [aws_caller_identity.current](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/caller_identity) | data source |
 | [aws_iam_policy_document.lambda_assume_role](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_policy_document) | data source |
 | [aws_iam_policy_document.lambda_logging](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_policy_document) | data source |
@@ -417,10 +467,12 @@ Apache 2.0
 | <a name="input_function_name"></a> [function\_name](#input\_function\_name) | Name of the Lambda function | `string` | n/a | yes |
 | <a name="input_handler"></a> [handler](#input\_handler) | Lambda function handler (format: file.function\_name) | `string` | `"main.lambda_handler"` | no |
 | <a name="input_kms_key_id"></a> [kms\_key\_id](#input\_kms\_key\_id) | ARN of the KMS key for encrypting CloudWatch Logs and SNS topic.<br/>If not specified, AWS-managed encryption keys are used.<br/>The key must allow the CloudWatch Logs and SNS services to use it. | `string` | `null` | no |
+| <a name="input_lambda_insights_layer_arn"></a> [lambda\_insights\_layer\_arn](#input\_lambda\_insights\_layer\_arn) | Full ARN of the Lambda Insights extension layer version to attach when the memory alarm<br/>is enabled. Only used when memory\_utilization\_threshold\_percent is set. If null, the<br/>module uses a sensible default matching var.architecture. Override this to pin a specific<br/>version or use a different region<br/>(see https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Lambda-Insights-extension-versions.html ). | `string` | `null` | no |
 | <a name="input_lambda_security_group_ids"></a> [lambda\_security\_group\_ids](#input\_lambda\_security\_group\_ids) | List of security group IDs for Lambda VPC configuration. Required if lambda\_subnet\_ids is specified. | `list(string)` | `null` | no |
 | <a name="input_lambda_source_dir"></a> [lambda\_source\_dir](#input\_lambda\_source\_dir) | Path to the directory containing Lambda function source code | `string` | n/a | yes |
 | <a name="input_lambda_subnet_ids"></a> [lambda\_subnet\_ids](#input\_lambda\_subnet\_ids) | List of subnet IDs for Lambda VPC configuration. The subnets must have NAT gateway for internet access. If not specified, Lambda will not be attached to a VPC. | `list(string)` | `null` | no |
 | <a name="input_memory_size"></a> [memory\_size](#input\_memory\_size) | Lambda function memory size in MB | `number` | `128` | no |
+| <a name="input_memory_utilization_threshold_percent"></a> [memory\_utilization\_threshold\_percent](#input\_memory\_utilization\_threshold\_percent) | Percentage of allocated memory that triggers the memory utilization alarm (1-100).<br/>If null (default), the memory alarm is disabled and Lambda Insights is NOT enabled.<br/>When set, the module attaches the AWS-managed Lambda Insights extension layer to the<br/>function, grants the CloudWatchLambdaInsightsExecutionRolePolicy managed policy to the<br/>execution role, and creates a CloudWatch alarm on the LambdaInsights memory\_utilization<br/>metric. Enabling this incurs Lambda Insights charges. | `number` | `null` | no |
 | <a name="input_python_version"></a> [python\_version](#input\_python\_version) | Python runtime version. Must be one of https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html | `string` | `"python3.12"` | no |
 | <a name="input_requirements_file"></a> [requirements\_file](#input\_requirements\_file) | Path to requirements.txt file for Python dependencies.<br/>Dependencies will be installed with platform-specific wheels for the target architecture.<br/>If not specified, the module will automatically look for requirements.txt in var.lambda\_source\_dir.<br/>Set to null to explicitly skip dependency installation. | `string` | `null` | no |
 | <a name="input_sns_topic_name"></a> [sns\_topic\_name](#input\_sns\_topic\_name) | Name for the SNS topic. If not provided, defaults to '<function\_name>-alarms' | `string` | `null` | no |
@@ -441,8 +493,10 @@ Apache 2.0
 | <a name="output_lambda_function_invoke_arn"></a> [lambda\_function\_invoke\_arn](#output\_lambda\_function\_invoke\_arn) | Invoke ARN of the Lambda function (for use with API Gateway, etc.) |
 | <a name="output_lambda_function_name"></a> [lambda\_function\_name](#output\_lambda\_function\_name) | Name of the Lambda function |
 | <a name="output_lambda_function_qualified_arn"></a> [lambda\_function\_qualified\_arn](#output\_lambda\_function\_qualified\_arn) | Qualified ARN of the Lambda function (includes version) |
+| <a name="output_lambda_insights_layer_arn"></a> [lambda\_insights\_layer\_arn](#output\_lambda\_insights\_layer\_arn) | ARN of the Lambda Insights extension layer attached to the function (null if memory alarm is disabled) |
 | <a name="output_lambda_role_arn"></a> [lambda\_role\_arn](#output\_lambda\_role\_arn) | ARN of the IAM role used by the Lambda function |
 | <a name="output_lambda_role_name"></a> [lambda\_role\_name](#output\_lambda\_role\_name) | Name of the IAM role used by the Lambda function |
+| <a name="output_memory_alarm_arn"></a> [memory\_alarm\_arn](#output\_memory\_alarm\_arn) | ARN of the memory utilization CloudWatch alarm (if enabled via memory\_utilization\_threshold\_percent) |
 | <a name="output_pending_email_confirmations"></a> [pending\_email\_confirmations](#output\_pending\_email\_confirmations) | List of email addresses pending SNS subscription confirmation |
 | <a name="output_requirements_file_used"></a> [requirements\_file\_used](#output\_requirements\_file\_used) | Path to the requirements.txt file used for packaging (or 'none' if no dependencies) |
 | <a name="output_s3_bucket_arn"></a> [s3\_bucket\_arn](#output\_s3\_bucket\_arn) | ARN of the S3 bucket storing Lambda packages |

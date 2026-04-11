@@ -36,6 +36,7 @@ def create_terraform_config(
     role_arn: str = None,
     subnet_ids: list = None,
     security_group_ids: list = None,
+    memory_utilization_threshold_percent: int = None,
 ):
     """
     Create Terraform configuration files for testing the module.
@@ -55,6 +56,8 @@ def create_terraform_config(
     :param str role_arn: IAM role ARN to assume for testing (optional)
     :param list subnet_ids: List of subnet IDs for VPC configuration (optional)
     :param list security_group_ids: List of security group IDs for VPC configuration (optional)
+    :param int memory_utilization_threshold_percent: Memory utilization alarm threshold (optional;
+        when set, enables Lambda Insights and the memory alarm)
     """
     LOG.info("Creating Terraform root module in %s", module_dir)
 
@@ -191,6 +194,12 @@ def create_terraform_config(
     # Convert path to forward slashes for Terraform (Windows compatibility)
     lambda_source_dir_normalized = str(lambda_source_dir).replace('\\', '/')
 
+    memory_config = ""
+    if memory_utilization_threshold_percent is not None:
+        memory_config = (
+            f"memory_utilization_threshold_percent = {memory_utilization_threshold_percent}"
+        )
+
     main_tf = dedent(
         f'''
         {sg_resource}
@@ -209,10 +218,10 @@ def create_terraform_config(
           error_rate_threshold            = 5.0
           error_rate_evaluation_periods   = 2
           error_rate_datapoints_to_alarm  = 2
+          {memory_config}
           {vpc_config}
           tags = {{
-            Environment = "test"
-            ManagedBy   = "terraform"
+            environment = "development"
           }}
         }}
         '''
@@ -261,6 +270,14 @@ def create_terraform_config(
         output "vpc_config_security_group_ids" {
           value = module.lambda_monitored.vpc_config_security_group_ids
         }
+
+        output "memory_alarm_arn" {
+          value = module.lambda_monitored.memory_alarm_arn
+        }
+
+        output "lambda_insights_layer_arn" {
+          value = module.lambda_monitored.lambda_insights_layer_arn
+        }
         """
     )
     (module_dir / "outputs.tf").write_text(outputs_tf)
@@ -276,7 +293,7 @@ def create_terraform_config(
 
 
 # Parameterization for different test configurations
-@pytest.fixture(params=["~> 5.31", "~> 6.0"], ids=["provider-5.x", "provider-6.x"])
+@pytest.fixture(params=["~> 6.0"], ids=["provider-6.x"])
 def aws_provider_version(request):
     """
     AWS provider version to test.

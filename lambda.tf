@@ -14,6 +14,8 @@ resource "aws_lambda_function" "this" {
 
   source_code_hash = local.source_code_hash
 
+  layers = local.lambda_insights_enabled ? [local.lambda_insights_layer_arn] : null
+
   dynamic "environment" {
     for_each = length(var.environment_variables) > 0 ? [1] : []
     content {
@@ -32,6 +34,7 @@ resource "aws_lambda_function" "this" {
   depends_on = [
     aws_iam_role_policy.lambda_logging,
     aws_iam_role_policy.lambda_vpc_access,
+    aws_iam_role_policy_attachment.lambda_insights,
     aws_cloudwatch_log_group.lambda
   ]
 

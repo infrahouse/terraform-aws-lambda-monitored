@@ -210,6 +210,41 @@ variable "duration_threshold_percent" {
   }
 }
 
+variable "memory_utilization_threshold_percent" {
+  description = <<-EOT
+    Percentage of allocated memory that triggers the memory utilization alarm (1-100).
+    If null (default), the memory alarm is disabled and Lambda Insights is NOT enabled.
+    When set, the module attaches the AWS-managed Lambda Insights extension layer to the
+    function, grants the CloudWatchLambdaInsightsExecutionRolePolicy managed policy to the
+    execution role, and creates a CloudWatch alarm on the LambdaInsights memory_utilization
+    metric. Enabling this incurs Lambda Insights charges.
+  EOT
+  type        = number
+  default     = null
+
+  validation {
+    condition     = var.memory_utilization_threshold_percent == null ? true : (var.memory_utilization_threshold_percent > 0 && var.memory_utilization_threshold_percent <= 100)
+    error_message = "memory_utilization_threshold_percent must be between 1 and 100, or null to disable the alarm"
+  }
+}
+
+variable "lambda_insights_layer_arn" {
+  description = <<-EOT
+    Full ARN of the Lambda Insights extension layer version to attach when the memory alarm
+    is enabled. Only used when memory_utilization_threshold_percent is set. If null, the
+    module uses a sensible default matching var.architecture. Override this to pin a specific
+    version or use a different region
+    (see https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Lambda-Insights-extension-versions.html ).
+  EOT
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.lambda_insights_layer_arn == null ? true : can(regex("^arn:aws:lambda:", var.lambda_insights_layer_arn))
+    error_message = "lambda_insights_layer_arn must be a valid Lambda layer ARN starting with 'arn:aws:lambda:'"
+  }
+}
+
 variable "tags" {
   description = "Map of tags to assign to resources"
   type        = map(string)

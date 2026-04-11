@@ -103,6 +103,32 @@ resource "aws_cloudwatch_metric_alarm" "throttles" {
   tags = local.tags
 }
 
+# CloudWatch alarm for Lambda memory utilization
+# Uses the Lambda Insights memory_utilization metric (percentage of allocated memory used).
+# Lambda Insights is attached as a layer + IAM policy only when this alarm is enabled.
+resource "aws_cloudwatch_metric_alarm" "memory" {
+  count = local.lambda_insights_enabled ? 1 : 0
+
+  alarm_name          = "${var.function_name}-memory"
+  alarm_description   = "Lambda function ${var.function_name} memory utilization exceeds ${var.memory_utilization_threshold_percent}% of allocated memory"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "memory_utilization"
+  namespace           = "LambdaInsights"
+  period              = 60
+  statistic           = "Maximum"
+  threshold           = var.memory_utilization_threshold_percent
+  treat_missing_data  = "notBreaching"
+
+  dimensions = {
+    function_name = aws_lambda_function.this.function_name
+  }
+
+  alarm_actions = local.all_alarm_topic_arns
+
+  tags = local.tags
+}
+
 # CloudWatch alarm for Lambda execution duration approaching timeout
 # Triggers when execution duration exceeds configured percentage of timeout
 # Threshold is calculated as: timeout * (duration_threshold_percent / 100) * 1000 (convert to milliseconds)

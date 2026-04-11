@@ -10,8 +10,10 @@ This module tests the Lambda monitoring module across different configurations:
 
 import json
 import time
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from infrahouse_core.timeout import timeout
 from pytest_infrahouse import terraform_apply
 
 from tests.conftest import LOG, create_terraform_config
@@ -50,7 +52,7 @@ class TestSimpleLambda:
             test_module_dir,
             lambda_source,
             function_name,
-            "test@example.com",
+            "devnull@infrahouse.com",
             aws_provider_version,
             python_version,
             architecture,
@@ -111,7 +113,7 @@ class TestSimpleLambda:
             test_module_dir,
             lambda_source,
             function_name,
-            "test@example.com",
+            "devnull@infrahouse.com",
             "~> 5.31",
             python_version,
             role_arn=test_role_arn,
@@ -170,7 +172,7 @@ class TestLambdaWithDependencies:
             test_module_dir,
             lambda_source,
             function_name,
-            "test@example.com",
+            "devnull@infrahouse.com",
             "~> 5.31",
             python_version,
             architecture,
@@ -218,7 +220,7 @@ class TestLambdaWithDependencies:
             test_module_dir,
             lambda_source,
             function_name,
-            "test@example.com",
+            "devnull@infrahouse.com",
             "~> 5.31",
             architecture=architecture,
             role_arn=test_role_arn,
@@ -280,7 +282,7 @@ class TestErrorMonitoring:
             test_module_dir,
             lambda_source,
             function_name,
-            "test@example.com",
+            "devnull@infrahouse.com",
             "~> 5.31",
             alert_strategy="immediate",
             role_arn=test_role_arn,
@@ -344,7 +346,7 @@ class TestErrorMonitoring:
             test_module_dir,
             lambda_source,
             function_name,
-            "test@example.com",
+            "devnull@infrahouse.com",
             "~> 5.31",
             alert_strategy="threshold",
             role_arn=test_role_arn,
@@ -396,7 +398,7 @@ class TestSNSIntegration:
         """
         function_name = "test-sns-topic"
         lambda_source = fixtures_dir / "simple_lambda"
-        test_email = "test@example.com"
+        test_email = "devnull@infrahouse.com"
 
         create_terraform_config(
             test_module_dir,
@@ -424,6 +426,138 @@ class TestSNSIntegration:
             ]
             assert len(email_subs) >= 1
             assert any(test_email in s["Endpoint"] for s in email_subs)
+
+
+class TestMemoryMonitoring:
+    """Test suite for the Lambda Insights-backed memory utilization alarm."""
+
+    def test_memory_alarm_created(
+        self,
+        test_module_dir,
+        fixtures_dir,
+        lambda_client,
+        cloudwatch_client,
+        keep_after,
+        test_role_arn,
+    ):
+        """
+        Test that setting memory_utilization_threshold_percent provisions:
+
+        - the CloudWatch memory alarm on the LambdaInsights memory_utilization metric,
+        - the Lambda Insights extension layer on the function,
+        - the CloudWatchLambdaInsightsExecutionRolePolicy managed policy on the role.
+
+        :param Path test_module_dir: Temporary test module directory
+        :param Path fixtures_dir: Path to Lambda fixtures
+        :param lambda_client: Boto3 Lambda client fixture
+        :param cloudwatch_client: Boto3 CloudWatch client fixture
+        :param bool keep_after: Whether to keep resources after test
+        :param str test_role_arn: IAM role ARN for testing
+        """
+        function_name = "test-memory-alarm"
+        lambda_source = fixtures_dir / "simple_lambda"
+
+        create_terraform_config(
+            test_module_dir,
+            lambda_source,
+            function_name,
+            "devnull@infrahouse.com",
+            "~> 5.31",
+            role_arn=test_role_arn,
+            memory_utilization_threshold_percent=80,
+        )
+
+        with terraform_apply(
+            str(test_module_dir),
+            destroy_after=not keep_after,
+            json_output=True,
+        ) as tf_output:
+            # The module should have created the memory alarm.
+            memory_alarm_arn = tf_output["memory_alarm_arn"]["value"]
+            assert memory_alarm_arn, "memory_alarm_arn output is empty"
+            assert ":alarm:" in memory_alarm_arn
+
+            # The Lambda Insights layer must be reported.
+            insights_layer_arn = tf_output["lambda_insights_layer_arn"]["value"]
+            assert insights_layer_arn, "lambda_insights_layer_arn output is empty"
+            assert "LambdaInsightsExtension" in insights_layer_arn
+
+            # Verify the alarm exists in CloudWatch with the expected metric/threshold.
+            alarm_name = f"{function_name}-memory"
+            alarms = cloudwatch_client.describe_alarms(AlarmNames=[alarm_name])
+            assert len(alarms["MetricAlarms"]) == 1
+            alarm = alarms["MetricAlarms"][0]
+            assert alarm["Namespace"] == "LambdaInsights"
+            assert alarm["MetricName"] == "memory_utilization"
+            assert alarm["Threshold"] == 80.0
+            assert alarm["ComparisonOperator"] == "GreaterThanThreshold"
+
+            # Verify the Lambda function has the Insights layer attached.
+            function_cfg = lambda_client.get_function_configuration(
+                FunctionName=tf_output["lambda_function_name"]["value"]
+            )
+            attached_layers = [layer["Arn"] for layer in function_cfg.get("Layers", [])]
+            assert any(
+                "LambdaInsightsExtension" in arn for arn in attached_layers
+            ), f"Lambda Insights layer not attached. Layers: {attached_layers}"
+
+            # Invoke the function a few times so Lambda Insights has something to publish.
+            function_name_value = tf_output["lambda_function_name"]["value"]
+            for _ in range(3):
+                invoke_response = lambda_client.invoke(
+                    FunctionName=function_name_value,
+                    InvocationType="RequestResponse",
+                    Payload=json.dumps({}),
+                )
+                assert invoke_response["StatusCode"] == 200
+                assert "FunctionError" not in invoke_response
+
+            # Poll the LambdaInsights namespace for the memory_utilization metric.
+            # Lambda Insights publishes on invocation, but CloudWatch GetMetricStatistics can
+            # lag by up to ~15 minutes before the datapoint becomes queryable, so budget for that.
+            utilization_pct = None
+            used_memory_mb = None
+            with timeout(900):
+                while utilization_pct is None:
+                    end_time = datetime.now(timezone.utc)
+                    start_time = end_time - timedelta(minutes=15)
+                    util_stats = cloudwatch_client.get_metric_statistics(
+                        Namespace="LambdaInsights",
+                        MetricName="memory_utilization",
+                        Dimensions=[
+                            {"Name": "function_name", "Value": function_name_value}
+                        ],
+                        StartTime=start_time,
+                        EndTime=end_time,
+                        Period=60,
+                        Statistics=["Maximum"],
+                    )
+                    util_points = util_stats.get("Datapoints", [])
+                    if util_points:
+                        utilization_pct = max(dp["Maximum"] for dp in util_points)
+                        used_stats = cloudwatch_client.get_metric_statistics(
+                            Namespace="LambdaInsights",
+                            MetricName="used_memory_max",
+                            Dimensions=[
+                                {"Name": "function_name", "Value": function_name_value}
+                            ],
+                            StartTime=start_time,
+                            EndTime=end_time,
+                            Period=60,
+                            Statistics=["Maximum"],
+                        )
+                        used_memory_mb = max(
+                            dp["Maximum"] for dp in used_stats["Datapoints"]
+                        )
+                        break
+                    LOG.info("Waiting for Lambda Insights memory_utilization datapoints...")
+                    time.sleep(30)
+
+            LOG.info(
+                "Lambda Insights memory usage: %.2f MB max, %.2f%% utilization",
+                used_memory_mb,
+                utilization_pct,
+            )
 
 
 class TestVPCIntegration:
@@ -470,7 +604,7 @@ class TestVPCIntegration:
             test_module_dir,
             lambda_source,
             function_name,
-            "test@example.com",
+            "devnull@infrahouse.com",
             "~> 5.31",
             subnet_ids=subnet_private_ids,
             # security_group_ids=None means Terraform will create the SG
