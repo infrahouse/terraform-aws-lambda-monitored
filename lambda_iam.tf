@@ -20,12 +20,7 @@ resource "aws_iam_role" "lambda" {
 
   assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
 
-  tags = merge(
-    local.tags,
-    {
-      function_name = var.function_name
-    }
-  )
+  tags = local.tags
 }
 
 # IAM policy document for CloudWatch Logs
@@ -143,4 +138,13 @@ resource "aws_iam_role_policy_attachment" "additional" {
 
   role       = aws_iam_role.lambda.name
   policy_arn = var.additional_iam_policy_arns[count.index]
+}
+
+# Grant the Lambda Insights extension permission to publish metrics.
+# Only attached when the memory utilization alarm is enabled.
+resource "aws_iam_role_policy_attachment" "lambda_insights" {
+  count = local.lambda_insights_enabled ? 1 : 0
+
+  role       = aws_iam_role.lambda.name
+  policy_arn = "arn:aws:iam::aws:policy/CloudWatchLambdaInsightsExecutionRolePolicy"
 }

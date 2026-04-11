@@ -4,6 +4,7 @@ locals {
 
   default_module_tags = {
     created_by_module = local.module
+    function_name     = var.function_name
   }
 
   tags = merge(var.tags, local.default_module_tags)
@@ -39,4 +40,18 @@ locals {
       ]
     )
   )
+
+  # Lambda Insights extension layer (only used when memory alarm is enabled).
+  # AWS publishes the layer under the 580247275435 account in every region. Version and
+  # layer name differ by architecture. The ARN is overridable via var.lambda_insights_layer_arn.
+  # Versions pinned from https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Lambda-Insights-extension-versions.html
+  lambda_insights_publisher_account = "580247275435"
+  lambda_insights_layer_defaults = {
+    x86_64 = "arn:aws:lambda:${data.aws_region.current.name}:${local.lambda_insights_publisher_account}:layer:LambdaInsightsExtension:56"
+    arm64  = "arn:aws:lambda:${data.aws_region.current.name}:${local.lambda_insights_publisher_account}:layer:LambdaInsightsExtension-Arm64:20"
+  }
+  lambda_insights_enabled = var.memory_utilization_threshold_percent != null
+  lambda_insights_layer_arn = local.lambda_insights_enabled ? (
+    var.lambda_insights_layer_arn != null ? var.lambda_insights_layer_arn : local.lambda_insights_layer_defaults[var.architecture]
+  ) : null
 }

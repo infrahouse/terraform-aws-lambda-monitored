@@ -93,6 +93,18 @@ output "duration_alarm_arn" {
   ) : null
 }
 
+output "memory_alarm_arn" {
+  description = "ARN of the memory utilization CloudWatch alarm (if enabled via memory_utilization_threshold_percent)"
+  value = local.lambda_insights_enabled ? try(
+    aws_cloudwatch_metric_alarm.memory[0].arn, null
+  ) : null
+}
+
+output "lambda_insights_layer_arn" {
+  description = "ARN of the Lambda Insights extension layer attached to the function (null if memory alarm is disabled)"
+  value       = local.lambda_insights_layer_arn
+}
+
 # VPC outputs
 
 output "vpc_config_subnet_ids" {
