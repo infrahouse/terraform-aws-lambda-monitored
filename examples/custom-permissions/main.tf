@@ -14,9 +14,9 @@ provider "aws" {
 
   default_tags {
     tags = {
-      Environment = "example"
-      Project     = "lambda-monitored-custom-permissions"
-      ManagedBy   = "terraform"
+      environment = "example"
+      project     = "lambda-monitored-custom-permissions"
+      created_by  = "infrahouse/terraform-aws-lambda-monitored"
     }
   }
 }
@@ -39,7 +39,7 @@ resource "aws_dynamodb_table" "file_metadata" {
 
   tags = {
     Name        = "file-metadata-${var.environment}"
-    Environment = var.environment
+    environment = var.environment
   }
 }
 
@@ -49,7 +49,7 @@ resource "aws_s3_bucket" "uploads" {
 
   tags = {
     Name        = "lambda-uploads-${var.environment}"
-    Environment = var.environment
+    environment = var.environment
   }
 }
 
@@ -101,7 +101,7 @@ resource "aws_iam_policy" "lambda_s3_access" {
   })
 
   tags = {
-    Environment = var.environment
+    environment = var.environment
   }
 }
 
@@ -127,13 +127,14 @@ resource "aws_iam_policy" "lambda_dynamodb_access" {
   })
 
   tags = {
-    Environment = var.environment
+    environment = var.environment
   }
 }
 
 # Use the lambda-monitored module with custom IAM permissions
 module "file_processor" {
-  source = "../../" # Use published version: source = "infrahouse/lambda-monitored/aws"
+  source  = "registry.infrahouse.com/infrahouse/lambda-monitored/aws"
+  version = "1.0.4"
 
   function_name     = "file-processor-${var.environment}"
   lambda_source_dir = "${path.module}/lambda"
@@ -170,8 +171,8 @@ module "file_processor" {
   cloudwatch_log_retention_days = 30
 
   tags = {
-    Environment = var.environment
-    Team        = "backend"
-    DataAccess  = "s3-dynamodb"
+    environment = var.environment
+    team        = "backend"
+    data_access = "s3-dynamodb"
   }
 }

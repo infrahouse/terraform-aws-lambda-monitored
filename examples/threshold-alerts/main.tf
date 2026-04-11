@@ -14,16 +14,17 @@ provider "aws" {
 
   default_tags {
     tags = {
-      Environment = "example"
-      Project     = "lambda-monitored-threshold-alerts"
-      ManagedBy   = "terraform"
+      environment = "example"
+      project     = "lambda-monitored-threshold-alerts"
+      created_by  = "infrahouse/terraform-aws-lambda-monitored"
     }
   }
 }
 
 # Use the lambda-monitored module with threshold alert strategy
 module "data_ingestion" {
-  source = "../../" # Use published version: source = "infrahouse/lambda-monitored/aws"
+  source  = "registry.infrahouse.com/infrahouse/lambda-monitored/aws"
+  version = "1.0.4"
 
   function_name     = "data-ingestion-threshold"
   lambda_source_dir = "${path.module}/lambda"
@@ -59,8 +60,8 @@ module "data_ingestion" {
   enable_throttle_alarms = true
 
   tags = {
-    CriticalityLevel = "medium"
-    Team             = "data-engineering"
-    DataSource       = "external-apis"
+    criticality_level = "medium"
+    team              = "data-engineering"
+    data_source       = "external-apis"
   }
 }

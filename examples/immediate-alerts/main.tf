@@ -14,16 +14,17 @@ provider "aws" {
 
   default_tags {
     tags = {
-      Environment = "example"
-      Project     = "lambda-monitored-immediate-alerts"
-      ManagedBy   = "terraform"
+      environment = "example"
+      project     = "lambda-monitored-immediate-alerts"
+      created_by  = "infrahouse/terraform-aws-lambda-monitored"
     }
   }
 }
 
 # Use the lambda-monitored module with immediate alert strategy
 module "order_processor" {
-  source = "../../" # Use published version: source = "infrahouse/lambda-monitored/aws"
+  source  = "registry.infrahouse.com/infrahouse/lambda-monitored/aws"
+  version = "1.0.4"
 
   function_name     = "order-processor-immediate"
   lambda_source_dir = "${path.module}/lambda"
@@ -54,7 +55,7 @@ module "order_processor" {
   cloudwatch_log_retention_days = 30
 
   tags = {
-    CriticalityLevel = "high"
-    Team             = "payments"
+    criticality_level = "high"
+    team              = "payments"
   }
 }
