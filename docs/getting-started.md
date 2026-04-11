@@ -13,10 +13,10 @@ The module's packaging script runs on the machine where `terraform apply` execut
 | `python3` | Build virtualenv, install deps | `brew install python3` / `apt install python3` |
 | `pip3` | Install Python dependencies | `python3 -m ensurepip` |
 | `jq` | Parse AWS CLI JSON output | `brew install jq` / `apt install jq` |
-
-(Linux/macOS only — `infrahouse-core` doesn't support Windows.)
 | `terraform` | `~> 1.0` | <https://developer.hashicorp.com/terraform/install> |
 | `aws` CLI | Used by the S3 upload wait loop | <https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html> |
+
+Linux/macOS only — `infrahouse-core` doesn't support Windows.
 
 The packaging script fails fast with an install hint if any of these are missing.
 
@@ -47,10 +47,11 @@ my-project/
     └── requirements.txt # optional, only if you have deps
 ```
 
-`main.py` should export a handler function — by default the module looks for `main.handler`:
+`main.py` should export a handler function — by default the module looks for `main.lambda_handler` (override
+via the `handler` variable if you want a different name):
 
 ```python
-def handler(event, context):
+def lambda_handler(event, context):
     return {"statusCode": 200, "body": "hello"}
 ```
 

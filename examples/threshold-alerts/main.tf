@@ -14,9 +14,9 @@ provider "aws" {
 
   default_tags {
     tags = {
-      Environment = "example"
-      Project     = "lambda-monitored-threshold-alerts"
-      ManagedBy   = "terraform"
+      environment = "example"
+      project     = "lambda-monitored-threshold-alerts"
+      created_by  = "infrahouse/terraform-aws-lambda-monitored"
     }
   }
 }
@@ -60,8 +60,8 @@ module "data_ingestion" {
   enable_throttle_alarms = true
 
   tags = {
-    CriticalityLevel = "medium"
-    Team             = "data-engineering"
-    DataSource       = "external-apis"
+    criticality_level = "medium"
+    team              = "data-engineering"
+    data_source       = "external-apis"
   }
 }
