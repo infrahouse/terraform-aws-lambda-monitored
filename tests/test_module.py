@@ -114,7 +114,7 @@ class TestSimpleLambda:
             lambda_source,
             function_name,
             "devnull@infrahouse.com",
-            "~> 5.31",
+            "~> 6.0",
             python_version,
             role_arn=test_role_arn,
         )
@@ -173,7 +173,7 @@ class TestLambdaWithDependencies:
             lambda_source,
             function_name,
             "devnull@infrahouse.com",
-            "~> 5.31",
+            "~> 6.0",
             python_version,
             architecture,
             role_arn=test_role_arn,
@@ -221,7 +221,7 @@ class TestLambdaWithDependencies:
             lambda_source,
             function_name,
             "devnull@infrahouse.com",
-            "~> 5.31",
+            "~> 6.0",
             architecture=architecture,
             role_arn=test_role_arn,
         )
@@ -283,7 +283,7 @@ class TestErrorMonitoring:
             lambda_source,
             function_name,
             "devnull@infrahouse.com",
-            "~> 5.31",
+            "~> 6.0",
             alert_strategy="immediate",
             role_arn=test_role_arn,
         )
@@ -347,7 +347,7 @@ class TestErrorMonitoring:
             lambda_source,
             function_name,
             "devnull@infrahouse.com",
-            "~> 5.31",
+            "~> 6.0",
             alert_strategy="threshold",
             role_arn=test_role_arn,
         )
@@ -405,7 +405,7 @@ class TestSNSIntegration:
             lambda_source,
             function_name,
             test_email,
-            "~> 5.31",
+            "~> 6.0",
             role_arn=test_role_arn,
         )
 
@@ -462,7 +462,7 @@ class TestMemoryMonitoring:
             lambda_source,
             function_name,
             "devnull@infrahouse.com",
-            "~> 5.31",
+            "~> 6.0",
             role_arn=test_role_arn,
             memory_utilization_threshold_percent=80,
         )
@@ -605,7 +605,7 @@ class TestVPCIntegration:
             lambda_source,
             function_name,
             "devnull@infrahouse.com",
-            "~> 5.31",
+            "~> 6.0",
             subnet_ids=subnet_private_ids,
             # security_group_ids=None means Terraform will create the SG
             role_arn=test_role_arn,
