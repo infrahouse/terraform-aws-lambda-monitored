@@ -1,0 +1,17 @@
+framework:
+  - terraform
+skip-path:
+  - test_data
+  - tests
+  - examples
+  - .build
+skip-check:
+  - CKV_TF_1  # Module source version pinning - handled by Renovate
+  - CKV_TF_2  # Module source version pinning - handled by Renovate
+  - CKV_AWS_50  # X-Ray tracing - opt-in for consumers; enabling it incurs extra cost
+  - CKV_AWS_115  # Reserved concurrent executions - throttling policy left to consumers
+  - CKV_AWS_116  # Dead Letter Queue - this module's error strategy is CloudWatch alarms + SNS
+  - CKV_AWS_173  # Env var KMS encryption - callers pass secrets via Secrets Manager, not env vars
+  - CKV_AWS_272  # Code-signing configuration - requires separate signing profile setup
+compact: true
+quiet: false
