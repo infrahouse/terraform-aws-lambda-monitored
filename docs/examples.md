@@ -13,7 +13,7 @@ in the repo. They're also used as the module's integration test fixtures, so the
 ```hcl
 module "critical_processor" {
   source  = "registry.infrahouse.com/infrahouse/lambda-monitored/aws"
-  version = "1.0.4"
+  version = "1.1.0"
 
   function_name     = "critical-processor"
   lambda_source_dir = "${path.module}/lambda"
@@ -38,7 +38,7 @@ sustained elevated error rates.
 ```hcl
 module "data_ingestion" {
   source  = "registry.infrahouse.com/infrahouse/lambda-monitored/aws"
-  version = "1.0.4"
+  version = "1.1.0"
 
   function_name     = "data-ingestion"
   lambda_source_dir = "${path.module}/lambda"
@@ -69,7 +69,7 @@ resource "aws_iam_policy" "read_reports_bucket" {
 
 module "report_generator" {
   source  = "registry.infrahouse.com/infrahouse/lambda-monitored/aws"
-  version = "1.0.4"
+  version = "1.1.0"
 
   function_name     = "report-generator"
   lambda_source_dir = "${path.module}/lambda"
@@ -92,7 +92,7 @@ The module's baseline logging policy stays in place — your additional policies
 ```hcl
 module "payment_worker" {
   source  = "registry.infrahouse.com/infrahouse/lambda-monitored/aws"
-  version = "1.0.4"
+  version = "1.1.0"
 
   function_name     = "payment-worker"
   lambda_source_dir = "${path.module}/lambda"
@@ -117,7 +117,7 @@ PrivateLink.
 ```hcl
 module "database_migrator" {
   source  = "registry.infrahouse.com/infrahouse/lambda-monitored/aws"
-  version = "1.0.4"
+  version = "1.1.0"
 
   function_name     = "database-migrator"
   lambda_source_dir = "${path.module}/lambda"
@@ -139,7 +139,7 @@ ENI permissions **scoped to only the specified subnets** — it refuses to hand 
 ```hcl
 module "latency_critical" {
   source  = "registry.infrahouse.com/infrahouse/lambda-monitored/aws"
-  version = "1.0.4"
+  version = "1.1.0"
 
   function_name     = "latency-critical"
   lambda_source_dir = "${path.module}/lambda"
@@ -164,7 +164,7 @@ matching managed policy — this adds a small per-invocation cost. Leaving it `n
 ```hcl
 module "thumbnailer" {
   source  = "registry.infrahouse.com/infrahouse/lambda-monitored/aws"
-  version = "1.0.4"
+  version = "1.1.0"
 
   function_name     = "thumbnailer"
   lambda_source_dir = "${path.module}/lambda"

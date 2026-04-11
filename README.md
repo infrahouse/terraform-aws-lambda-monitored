@@ -90,7 +90,7 @@ The packaging and deployment scripts will check for these dependencies and provi
 ```hcl
 module "lambda" {
   source  = "registry.infrahouse.com/infrahouse/lambda-monitored/aws"
-  version = "1.0.4"
+  version = "1.1.0"
 
   function_name     = "my-lambda-function"
   lambda_source_dir = "${path.module}/lambda"
@@ -166,7 +166,7 @@ The module uses an intelligent packaging system that automatically handles Pytho
 ```hcl
 module "lambda" {
   source  = "registry.infrahouse.com/infrahouse/lambda-monitored/aws"
-  version = "1.0.4"
+  version = "1.1.0"
 
   function_name      = "my-function"
   lambda_source_dir  = "${path.module}/lambda"
@@ -228,7 +228,7 @@ Lambda functions can be attached to a VPC to access resources in private subnets
 ```hcl
 module "lambda" {
   source  = "registry.infrahouse.com/infrahouse/lambda-monitored/aws"
-  version = "1.0.4"
+  version = "1.1.0"
 
   function_name     = "my-vpc-function"
   lambda_source_dir = "${path.module}/lambda"
@@ -281,7 +281,7 @@ which ships an extension layer with the function and publishes CloudWatch metric
 ```hcl
 module "lambda" {
   source  = "registry.infrahouse.com/infrahouse/lambda-monitored/aws"
-  version = "1.0.4"
+  version = "1.1.0"
 
   function_name     = "my-lambda-function"
   lambda_source_dir = "${path.module}/lambda"

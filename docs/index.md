@@ -43,7 +43,7 @@ the full monitoring stack so you can pass a compliance audit without follow-up w
 ```hcl
 module "lambda" {
   source  = "registry.infrahouse.com/infrahouse/lambda-monitored/aws"
-  version = "1.0.4"
+  version = "1.1.0"
 
   function_name     = "my-lambda-function"
   lambda_source_dir = "${path.module}/lambda"

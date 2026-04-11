@@ -24,7 +24,7 @@ provider "aws" {
 # Use the lambda-monitored module with immediate alert strategy
 module "order_processor" {
   source  = "registry.infrahouse.com/infrahouse/lambda-monitored/aws"
-  version = "1.0.4"
+  version = "1.1.0"
 
   function_name     = "order-processor-immediate"
   lambda_source_dir = "${path.module}/lambda"
