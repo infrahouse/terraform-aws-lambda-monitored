@@ -4,9 +4,12 @@ data "aws_caller_identity" "current" {}
 # S3 bucket for Lambda deployment packages
 module "lambda_bucket" {
   source  = "registry.infrahouse.com/infrahouse/s3-bucket/aws"
-  version = "0.3.1"
+  version = "0.6.0"
 
   bucket_prefix = substr("${local.sanitized_function_name}-lambda", 0, 37)
+  vanta_exemptions = {
+    "aws-s3-cross-region-replication-enabled" = "Lambda deployment artifact bucket - ephemeral build output. No DR value"
+  }
   tags = merge(
     local.tags,
     {
