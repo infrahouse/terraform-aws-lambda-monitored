@@ -466,7 +466,7 @@ Apache 2.0 — see [LICENSE](LICENSE).
 
 | Name | Source | Version |
 |------|--------|---------|
-| <a name="module_lambda_bucket"></a> [lambda\_bucket](#module\_lambda\_bucket) | registry.infrahouse.com/infrahouse/s3-bucket/aws | 0.3.1 |
+| <a name="module_lambda_bucket"></a> [lambda\_bucket](#module\_lambda\_bucket) | registry.infrahouse.com/infrahouse/s3-bucket/aws | 0.6.0 |
 
 ## Resources
 
