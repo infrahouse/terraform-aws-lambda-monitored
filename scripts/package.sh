@@ -75,13 +75,19 @@ case "${ARCHITECTURE}" in
         ;;
 esac
 
-# Map architecture to manylinux platform
+# Map architecture to manylinux platform.
+#
+# We install against manylinux_2_28 (glibc 2.28), the Amazon Linux 2023 floor
+# that all supported Lambda Python runtimes (python3.12+) run on. Under PEP 600
+# pip also accepts every older tag (manylinux2014 / _2_17 and below) for deps
+# that don't ship a 2_28 wheel, so this is strictly more permissive than the old
+# manylinux2014 default while enabling packages like pyarrow>=21 (issue #29).
 case "${ARCH}" in
     aarch64)
-        PLATFORM="manylinux2014_aarch64"
+        PLATFORM="manylinux_2_28_aarch64"
         ;;
     x86_64)
-        PLATFORM="manylinux2014_x86_64"
+        PLATFORM="manylinux_2_28_x86_64"
         ;;
     *)
         echo "Error: Could not map architecture to manylinux platform: ${ARCH}" >&2

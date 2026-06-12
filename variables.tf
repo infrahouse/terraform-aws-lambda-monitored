@@ -1,11 +1,17 @@
 variable "python_version" {
-  description = "Python runtime version. Must be one of https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html"
+  description = <<-EOT
+    Python runtime version. Must be an Amazon Linux 2023 runtime (python3.12 or
+    python3.13): this module installs manylinux_2_28 wheels (glibc 2.28), which
+    only AL2023 runtimes can load. Earlier runtimes (Amazon Linux 2, python <=
+    3.11) are not supported. See
+    https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html
+  EOT
   type        = string
   default     = "python3.12"
 
   validation {
-    condition     = can(regex("^python3\\.(9|10|11|12|13)$", var.python_version))
-    error_message = "Python version must be one of: python3.9, python3.10, python3.11, python3.12, python3.13"
+    condition     = can(regex("^python3\\.(12|13)$", var.python_version))
+    error_message = "Python version must be python3.12 or python3.13 (Amazon Linux 2023 runtimes). Earlier runtimes (Amazon Linux 2) cannot load manylinux_2_28 wheels."
   }
 }
 
