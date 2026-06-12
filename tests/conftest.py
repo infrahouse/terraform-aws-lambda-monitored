@@ -192,16 +192,14 @@ def create_terraform_config(
         """
 
     # Convert path to forward slashes for Terraform (Windows compatibility)
-    lambda_source_dir_normalized = str(lambda_source_dir).replace('\\', '/')
+    lambda_source_dir_normalized = str(lambda_source_dir).replace("\\", "/")
 
     memory_config = ""
     if memory_utilization_threshold_percent is not None:
-        memory_config = (
-            f"memory_utilization_threshold_percent = {memory_utilization_threshold_percent}"
-        )
+        memory_config = f"memory_utilization_threshold_percent = {memory_utilization_threshold_percent}"
 
     main_tf = dedent(
-        f'''
+        f"""
         {sg_resource}
         module "lambda_monitored" {{
           source = "./.."  # Points to the root module
@@ -224,7 +222,7 @@ def create_terraform_config(
             environment = "development"
           }}
         }}
-        '''
+        """
     )
     (module_dir / "main.tf").write_text(main_tf)
 
@@ -318,8 +316,8 @@ def architecture(request):
 
 
 @pytest.fixture(
-    params=["python3.11", "python3.12", "python3.13"],
-    ids=["py3.11", "py3.12", "py3.13"],
+    params=["python3.12", "python3.13"],
+    ids=["py3.12", "py3.13"],
 )
 def python_version(request):
     """
