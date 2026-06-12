@@ -49,6 +49,10 @@ test-simple:  ## Run simple Lambda tests (use TEST_SELECTOR to filter)
 test-deps:  ## Run dependency packaging tests (use TEST_SELECTOR to filter)
 	$(call run_pytest,TestLambdaWithDependencies,tests/test_module.py)
 
+.PHONY: test-manylinux
+test-manylinux:  ## Run manylinux_2_28 wheel packaging tests (issue #29)
+	$(call run_pytest,TestManylinux228,tests/test_module.py)
+
 .PHONY: test-monitoring
 test-monitoring:  ## Run error monitoring tests (use TEST_SELECTOR to filter)
 	$(call run_pytest,TestErrorMonitoring,tests/test_module.py)

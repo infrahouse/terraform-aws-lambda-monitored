@@ -4,7 +4,7 @@ Comprehensive tests for terraform-aws-lambda-monitored module.
 This module tests the Lambda monitoring module across different configurations:
 - Multiple AWS provider versions (5.x and 6.x)
 - Different architectures (x86_64 and arm64)
-- Various Python versions (3.11, 3.12, 3.13)
+- Various Python versions (3.12, 3.13)
 - Alert strategies (immediate and threshold)
 """
 
@@ -243,7 +243,9 @@ class TestLambdaWithDependencies:
 
             # Parse response
             payload = json.loads(response["Payload"].read())
-            assert payload["statusCode"] == 200, f"Status code != 200 in payload: {payload}"
+            assert (
+                payload["statusCode"] == 200
+            ), f"Status code != 200 in payload: {payload}"
 
             # Verify requests library worked
             body = json.loads(payload["body"])
@@ -550,7 +552,9 @@ class TestMemoryMonitoring:
                             dp["Maximum"] for dp in used_stats["Datapoints"]
                         )
                         break
-                    LOG.info("Waiting for Lambda Insights memory_utilization datapoints...")
+                    LOG.info(
+                        "Waiting for Lambda Insights memory_utilization datapoints..."
+                    )
                     time.sleep(30)
 
             LOG.info(
@@ -657,4 +661,72 @@ class TestVPCIntegration:
             )
             LOG.info(
                 "The test verified that Lambda can create ENIs with least-privilege IAM policies"
+            )
+
+
+class TestManylinux228:
+    """Packages that only publish manylinux_2_28 wheels (issue #29)."""
+
+    def test_manylinux_2_28_packaging(
+        self,
+        test_module_dir,
+        fixtures_dir,
+        lambda_client,
+        keep_after,
+        test_role_arn,
+    ):
+        """
+        Test that a dependency shipping only manylinux_2_28 wheels packages and runs.
+
+        ``pyarrow>=21`` publishes only ``manylinux_2_28`` wheels (glibc 2.28). On the
+        unfixed module (``manylinux2014`` / glibc 2.17) this fails to resolve with
+        ``No matching distribution found for pyarrow``. After the fix the wheel
+        installs and loads at runtime on the Amazon Linux 2023 (python3.12) runtime.
+
+        Hardcoded to python3.12 + x86_64: a manylinux_2_28 wheel can only run on the
+        AL2023 runtime, so this is a single deterministic case rather than a
+        parametrized one.
+
+        :param Path test_module_dir: Temporary test module directory
+        :param Path fixtures_dir: Path to Lambda fixtures
+        :param lambda_client: Boto3 Lambda client fixture
+        :param bool keep_after: Whether to keep resources after test
+        :param str test_role_arn: IAM role ARN to assume for testing
+        """
+        function_name = "test-manylinux228-x8664-py312"
+        lambda_source = fixtures_dir / "lambda_with_manylinux_2_28_deps"
+
+        create_terraform_config(
+            test_module_dir,
+            lambda_source,
+            function_name,
+            "devnull@infrahouse.com",
+            "~> 6.0",
+            python_version="python3.12",
+            architecture="x86_64",
+            role_arn=test_role_arn,
+        )
+
+        with terraform_apply(
+            str(test_module_dir),
+            destroy_after=not keep_after,
+            json_output=True,
+        ) as tf_output:
+            response = lambda_client.invoke(
+                FunctionName=tf_output["lambda_function_name"]["value"],
+                InvocationType="RequestResponse",
+                Payload=json.dumps({}),
+            )
+            assert response["StatusCode"] == 200
+            assert "FunctionError" not in response
+
+            payload = json.loads(response["Payload"].read())
+            assert payload["statusCode"] == 200, f"payload: {payload}"
+            body = json.loads(payload["body"])
+            assert body["success"] is True
+            assert "pyarrow_version" in body
+
+            LOG.info(
+                "SUCCESS: manylinux_2_28-only wheel (pyarrow %s) packaged and ran",
+                body["pyarrow_version"],
             )
