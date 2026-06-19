@@ -75,19 +75,24 @@ case "${ARCHITECTURE}" in
         ;;
 esac
 
-# Map architecture to manylinux platform.
+# Map architecture to the manylinux platform ladder, most-specific first.
 #
-# We install against manylinux_2_28 (glibc 2.28), the Amazon Linux 2023 floor
-# that all supported Lambda Python runtimes (python3.12+) run on. Under PEP 600
-# pip also accepts every older tag (manylinux2014 / _2_17 and below) for deps
-# that don't ship a 2_28 wheel, so this is strictly more permissive than the old
-# manylinux2014 default while enabling packages like pyarrow>=21 (issue #29).
+# An explicit --platform makes pip match ONLY that tag's compatibility set; it
+# does NOT fall back to lower manylinux floors. So we must pass the whole ladder
+# and let pip pick the first matching wheel PER PACKAGE: packages that ship
+# manylinux_2_28 (e.g. pyarrow>=21, issue #29) get it, while packages that ship
+# only manylinux_2_17 / manylinux2014 (e.g. cffi, issue #31) still resolve.
+#
+# manylinux is a glibc FLOOR and glibc is backward-compatible, so every wheel
+# here (glibc >= 2.17) runs on the Amazon Linux 2023 runtime (glibc 2.34).
+# manylinux2014_* is the legacy alias for manylinux_2_17_*; listing both is
+# harmless and explicit.
 case "${ARCH}" in
     aarch64)
-        PLATFORM="manylinux_2_28_aarch64"
+        PLATFORMS=(manylinux_2_28_aarch64 manylinux_2_17_aarch64 manylinux2014_aarch64)
         ;;
     x86_64)
-        PLATFORM="manylinux_2_28_x86_64"
+        PLATFORMS=(manylinux_2_28_x86_64 manylinux_2_17_x86_64 manylinux2014_x86_64)
         ;;
     *)
         echo "Error: Could not map architecture to manylinux platform: ${ARCH}" >&2
@@ -100,7 +105,7 @@ echo "  Source: ${SOURCE_DIR}"
 echo "  Requirements: ${REQUIREMENTS_FILE}"
 echo "  Build: ${BUILD_DIR}"
 echo "  Zip: ${ZIP_OUTPUT}"
-echo "  Architecture: ${ARCH} (${PLATFORM})"
+echo "  Architecture: ${ARCH} (${PLATFORMS[*]})"
 echo "  Python: ${PYTHON_VERSION} (${PY_VER})"
 
 # Get absolute paths for comparison (before creating build dir)
@@ -129,10 +134,18 @@ fi
 if [[ "${REQUIREMENTS_FILE}" != "none" ]] && [[ -f "${REQUIREMENTS_FILE}" ]]; then
     echo "Installing dependencies from ${REQUIREMENTS_FILE}..."
 
+    # Expand the platform ladder into repeated --platform flags. pip picks the
+    # first matching wheel per package, so listing 2_28 before 2_17 prefers the
+    # newer floor where available and falls back where it isn't.
+    platform_args=()
+    for p in "${PLATFORMS[@]}"; do
+        platform_args+=(--platform "$p")
+    done
+
     # Install dependencies with platform-specific wheels
     python3 -m pip install \
         --only-binary=:all: \
-        --platform "${PLATFORM}" \
+        "${platform_args[@]}" \
         --implementation cp \
         --python-version "${PY_VER}" \
         --target "${BUILD_DIR}" \

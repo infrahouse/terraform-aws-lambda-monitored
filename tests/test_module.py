@@ -730,3 +730,75 @@ class TestManylinux228:
                 "SUCCESS: manylinux_2_28-only wheel (pyarrow %s) packaged and ran",
                 body["pyarrow_version"],
             )
+
+
+class TestManylinux217:
+    """Packages that only publish manylinux_2_17 wheels (issue #31)."""
+
+    def test_manylinux_2_17_packaging(
+        self,
+        test_module_dir,
+        fixtures_dir,
+        lambda_client,
+        keep_after,
+        test_role_arn,
+    ):
+        """
+        Test that a dependency shipping only manylinux_2_17 wheels packages and runs.
+
+        ``cffi`` (every version, including 2.0.0) publishes only
+        ``manylinux2014`` / ``manylinux_2_17`` Linux wheels and no
+        ``manylinux_2_28`` wheel. With a single ``--platform manylinux_2_28``
+        and ``--only-binary=:all:``, pip matches only that tag and refuses the
+        compatible 2_17 wheel, so installation fails with
+        ``ResolutionImpossible`` at ``terraform apply`` time. After the fix
+        (full platform ladder, most-specific first) the 2_17 wheel installs and
+        the compiled ``_cffi_backend`` extension loads on the Amazon Linux 2023
+        (python3.12) runtime, whose glibc 2.34 satisfies the 2_17 floor.
+
+        Hardcoded to python3.12 + x86_64: a single deterministic case rather
+        than a parametrized one, mirroring TestManylinux228.
+
+        :param Path test_module_dir: Temporary test module directory
+        :param Path fixtures_dir: Path to Lambda fixtures
+        :param lambda_client: Boto3 Lambda client fixture
+        :param bool keep_after: Whether to keep resources after test
+        :param str test_role_arn: IAM role ARN to assume for testing
+        """
+        function_name = "test-manylinux217-x8664-py312"
+        lambda_source = fixtures_dir / "lambda_with_manylinux_2_17_deps"
+
+        create_terraform_config(
+            test_module_dir,
+            lambda_source,
+            function_name,
+            "devnull@infrahouse.com",
+            "~> 6.0",
+            python_version="python3.12",
+            architecture="x86_64",
+            role_arn=test_role_arn,
+        )
+
+        with terraform_apply(
+            str(test_module_dir),
+            destroy_after=not keep_after,
+            json_output=True,
+        ) as tf_output:
+            response = lambda_client.invoke(
+                FunctionName=tf_output["lambda_function_name"]["value"],
+                InvocationType="RequestResponse",
+                Payload=json.dumps({}),
+            )
+            assert response["StatusCode"] == 200
+            assert "FunctionError" not in response
+
+            payload = json.loads(response["Payload"].read())
+            assert payload["statusCode"] == 200, f"payload: {payload}"
+            body = json.loads(payload["body"])
+            assert body["success"] is True
+            assert "cffi_version" in body
+
+            LOG.info(
+                "SUCCESS: manylinux_2_17-only wheel (cffi %s) packaged and ran",
+                body["cffi_version"],
+            )

@@ -27,8 +27,10 @@ the full monitoring stack so you can pass a compliance audit without follow-up w
   or `threshold` (error-rate metric math) for high-volume functions that expect occasional failures.
 - **Alerts go somewhere useful.** SNS topic with email subscriptions is created for you; you can also fan out
   to existing PagerDuty or Slack topics via `alarm_topic_arns`.
-- **Reproducible packaging.** Dependencies are installed with `--platform manylinux2014_{x86_64,aarch64}` so
-  your local machine's architecture and Python version don't leak into the deployment artifact.
+- **Reproducible packaging.** Dependencies are installed against a manylinux platform ladder
+  (`manylinux_2_28` → `manylinux_2_17`/`manylinux2014`, newest glibc floor first), so pip picks the best
+  Lambda-compatible wheel per package and your local machine's architecture and Python version don't leak
+  into the deployment artifact.
 - **Smart change detection.** The packager hashes your source files plus `requirements.txt` — not the entire
   `.build/` directory — so re-creating `.terraform` doesn't trigger spurious re-uploads.
 - **Tight IAM by default.** Execution role uses `name_prefix`, logging policy is scoped to the function's log
@@ -178,7 +180,9 @@ module "lambda" {
 ```
 
 **How it works:**
-1. The module uses platform-specific manylinux wheels (`manylinux2014_x86_64` or `manylinux2014_aarch64`)
+1. The module installs platform-specific manylinux wheels, trying the ladder `manylinux_2_28_${ARCH}` →
+   `manylinux_2_17_${ARCH}` → `manylinux2014_${ARCH}` (newest glibc floor first) and letting pip pick the best
+   match per package — so packages that only ship the older `manylinux_2_17`/`manylinux2014` wheels still resolve
 2. Dependencies are installed with `--only-binary=:all:` to ensure AWS Lambda compatibility
 3. Only re-packages when source code, dependencies, architecture, or Python version changes
 4. Automatically cleans up Python cache files (`__pycache__`, `.pyc`)

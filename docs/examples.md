@@ -177,5 +177,6 @@ module "thumbnailer" {
 }
 ```
 
-Pillow, numpy, and most popular libraries ship manylinux2014 aarch64 wheels. If pip falls back to a source dist,
+Pillow, numpy, and most popular libraries ship manylinux aarch64 wheels (`manylinux_2_28`, `manylinux_2_17`, or
+`manylinux2014` — the packager accepts any of them). If pip can't find a binary wheel for the target architecture,
 the `--only-binary=:all:` flag will fail the build rather than silently shipping a broken artifact.

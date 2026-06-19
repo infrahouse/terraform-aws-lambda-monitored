@@ -76,8 +76,12 @@ The root module is flat (not split into submodules). Files are grouped by concer
 - `source_code_files` defaults to `["main.py"]` — **only these patterns are hashed for change detection**. Installed
   dependencies are explicitly excluded to prevent spurious rebuilds after `.terraform` is recreated. Dependencies are
   tracked separately via `filemd5(requirements_file)`.
-- `scripts/package.sh` installs with `--only-binary=:all:` and `--platform manylinux2014_{x86_64,aarch64}` to
-  guarantee Lambda-compatible wheels; it requires `python3`, `pip3`, and `jq` on the host running `terraform apply`.
+- `scripts/package.sh` installs with `--only-binary=:all:` against a manylinux platform ladder, most-specific
+  first (`manylinux_2_28_{arch}` → `manylinux_2_17_{arch}` → `manylinux2014_{arch}`), so pip picks the best
+  Lambda-compatible wheel per package — packages shipping only `manylinux_2_17`/`manylinux2014` (e.g. `cffi`,
+  issue #31) still resolve while `manylinux_2_28`-only packages (e.g. `pyarrow>=21`, issue #29) get their newer
+  wheel. An explicit `--platform` matches only that tag's set (no auto-fallback to lower floors), which is why
+  the whole ladder is passed. Requires `python3`, `pip3`, and `jq` on the host running `terraform apply`.
 - `package_hash` is md5 of: source-files hash + requirements hash + architecture + python version + function name +
   `module_version`. Changing any of these causes a repackage and a new S3 object key.
 
