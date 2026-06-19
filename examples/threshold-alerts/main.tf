@@ -24,7 +24,7 @@ provider "aws" {
 # Use the lambda-monitored module with threshold alert strategy
 module "data_ingestion" {
   source  = "registry.infrahouse.com/infrahouse/lambda-monitored/aws"
-  version = "2.0.0"
+  version = "2.0.1"
 
   function_name     = "data-ingestion-threshold"
   lambda_source_dir = "${path.module}/lambda"

@@ -134,7 +134,7 @@ resource "aws_iam_policy" "lambda_dynamodb_access" {
 # Use the lambda-monitored module with custom IAM permissions
 module "file_processor" {
   source  = "registry.infrahouse.com/infrahouse/lambda-monitored/aws"
-  version = "2.0.0"
+  version = "2.0.1"
 
   function_name     = "file-processor-${var.environment}"
   lambda_source_dir = "${path.module}/lambda"
