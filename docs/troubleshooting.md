@@ -13,8 +13,9 @@ The script fails fast with the exact install command for your OS, so the error m
 
 ### `No matching distribution found` / `Could not find a version that satisfies the requirement`
 
-`scripts/package.sh` uses `--only-binary=:all:` with `--platform manylinux2014_${ARCH}`. If a package in your
-`requirements.txt` doesn't publish a manylinux wheel for the target architecture, pip will refuse rather than
+`scripts/package.sh` uses `--only-binary=:all:` with the manylinux platform ladder
+(`manylinux_2_28_${ARCH}` → `manylinux_2_17_${ARCH}` → `manylinux2014_${ARCH}`). If a package in your
+`requirements.txt` doesn't publish *any* of those manylinux wheels for the target architecture, pip will refuse rather than
 silently falling back to a source dist that won't run on Lambda.
 
 Options:

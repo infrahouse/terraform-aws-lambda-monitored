@@ -54,6 +54,8 @@ so wiping `.terraform` and rebuilding doesn't cause a spurious re-upload.
 ```bash
 pip install \
   --only-binary=:all: \
+  --platform manylinux_2_28_${ARCH} \
+  --platform manylinux_2_17_${ARCH} \
   --platform manylinux2014_${ARCH} \
   --target ./.build/${function_name}/ \
   -r requirements.txt
@@ -62,6 +64,13 @@ pip install \
 The `--only-binary=:all:` flag forces pip to reject source distributions so you can't accidentally
 ship a package that only builds on your Mac. The target platform matches the Lambda runtime, not
 the host.
+
+The platform tags form a ladder, newest glibc floor first. An explicit `--platform` makes pip match
+*only* that tag's compatibility set — it does **not** fall back to lower manylinux floors — so all the
+acceptable floors must be listed. pip then picks the first matching wheel per package: packages that
+ship `manylinux_2_28` (e.g. `pyarrow>=21`) get it, while packages that ship only `manylinux_2_17` /
+`manylinux2014` (e.g. `cffi`) still resolve. Since manylinux is a glibc *floor* and glibc is
+backward-compatible, every wheel here runs on the Amazon Linux 2023 runtime (glibc 2.34).
 
 ### Upload
 
