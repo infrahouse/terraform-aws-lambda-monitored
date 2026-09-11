@@ -58,6 +58,13 @@ aws sns list-subscriptions-by-topic --topic-arn <topic-arn>
 
 Look for `SubscriptionArn: PendingConfirmation`. Re-request the email via the console or `aws sns subscribe`.
 
+### `errors-immediate` stays in ALARM for minutes after a single error
+
+Expected. The alarm evaluates `ceil(timeout / 60) + 5` one-minute periods so it can catch errors that Lambda
+reports late in a long invocation, and it returns to `OK` only once the error's minute leaves that window: about
+6 minutes for a 60-second function, 20 minutes for a 900-second one. Errors inside that window don't send a new
+notification. See [Immediate alarm window](architecture.md#immediate-alarm-window).
+
 ### PagerDuty / Slack topic in `alarm_topic_arns` doesn't receive events
 
 Cross-account SNS topics need a **resource policy** on the target topic allowing `sns:Publish` from the source
