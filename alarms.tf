@@ -1,12 +1,23 @@
+locals {
+  # Lambda stamps an invocation's Errors datapoint with the minute the invocation started,
+  # but publishes it only when the invocation ends, up to var.timeout later (issue #33).
+  # A window shorter than that has already evaluated the minute as missing data when the
+  # datapoint lands, and never looks at it again. The 5 extra periods cover the start-minute
+  # offset (up to 1 min), publishing lag (about 1 min measured) and alarm evaluation delay.
+  errors_immediate_evaluation_periods = ceil(var.timeout / 60) + 5
+}
+
 # CloudWatch alarm for immediate error notifications
-# Triggers on any Lambda error
+# Triggers on any Lambda error: a single breaching datapoint anywhere in the window alarms.
+# The alarm then stays in ALARM until that datapoint's minute leaves the window.
 resource "aws_cloudwatch_metric_alarm" "errors_immediate" {
   count = var.enable_error_alarms && var.alert_strategy == "immediate" ? 1 : 0
 
   alarm_name          = "${var.function_name}-errors-immediate"
   alarm_description   = "Lambda function ${var.function_name} has errors - immediate alert"
   comparison_operator = "GreaterThanThreshold"
-  evaluation_periods  = 1
+  evaluation_periods  = local.errors_immediate_evaluation_periods
+  datapoints_to_alarm = 1
   metric_name         = "Errors"
   namespace           = "AWS/Lambda"
   period              = 60

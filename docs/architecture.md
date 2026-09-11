@@ -89,6 +89,18 @@ Lambda metric → CloudWatch alarm → SNS topic → {email subs, external topic
 `alarm_topic_arns`, and **every** alarm action writes to that combined list. So if you pass in a
 PagerDuty topic ARN, all four alarms will fan out to both the email subs and PagerDuty.
 
+### Immediate alarm window
+
+Lambda stamps an invocation's `Errors` datapoint with the minute the invocation **started**, but publishes it
+only when the invocation **ends**. An error 12 minutes into a run arrives as a datapoint 12 minutes old. A
+one-minute alarm has already evaluated that minute as missing data and never looks back, so it misses the error
+([#33](https://github.com/infrahouse/terraform-aws-lambda-monitored/issues/33)).
+
+`errors_immediate` therefore evaluates `ceil(timeout / 60) + 5` one-minute periods and alarms on a single breaching
+datapoint anywhere in them. The extra 5 periods cover the offset within the start minute, publishing lag and
+evaluation delay. An error still alarms as soon as its datapoint exists. The trade-off: the alarm stays in `ALARM`
+until the error's minute leaves the window, and another error inside that window does not notify again.
+
 ## IAM role naming
 
 The execution role uses `name_prefix = "${substr(var.function_name, 0, 37)}-"`. This is because:

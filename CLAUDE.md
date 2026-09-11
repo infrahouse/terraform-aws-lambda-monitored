@@ -62,6 +62,9 @@ The root module is flat (not split into submodules). Files are grouped by concer
 - `alarms.tf` — four CloudWatch alarms: `errors_immediate` (fires on any error) **or** `errors_threshold` (error-rate
   metric-math, `(errors / invocations) * 100`) depending on `alert_strategy`; always-on `throttles`; optional
   `duration` (only when `duration_threshold_percent` is set, computed against `var.timeout`).
+  **`errors_immediate` evaluates `ceil(var.timeout / 60) + 5` periods with `datapoints_to_alarm = 1`**: Lambda
+  stamps `Errors` at invocation start but publishes it at invocation end, so a shorter window misses late errors
+  (issue #33).
 - `sns.tf` / `cloudwatch.tf` — SNS topic + email subscriptions; log group with retention. Alarms fan out to
   `local.all_alarm_topic_arns` which merges the created topic with user-supplied `alarm_topic_arns` for
   PagerDuty/Slack integrations.

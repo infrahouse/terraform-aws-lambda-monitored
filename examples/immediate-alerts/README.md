@@ -121,7 +121,8 @@ alert_strategy = "immediate"
 This creates a CloudWatch alarm with:
 - **Metric**: Lambda Errors
 - **Threshold**: Greater than 0
-- **Evaluation Period**: 1 period (60 seconds)
+- **Period**: 60 seconds
+- **Evaluation Periods**: `ceil(timeout / 60) + 5`, so errors late in a long invocation still count
 - **Datapoints to Alarm**: 1
 
 ### Lambda Settings
