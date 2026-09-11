@@ -32,6 +32,7 @@ tests/
 │   ├── lambda_with_deps/  # Lambda with external packages (requests)
 │   └── lambda_with_errors/ # Lambda that can simulate errors
 ├── test_module.py         # Main test suite
+├── test_error_monitoring.py # Error alarm tests (immediate/threshold, late and sparse errors)
 ├── requirements.txt       # Test dependencies
 └── README.md             # This file
 ```
@@ -54,7 +55,7 @@ pytest tests/test_module.py::TestSimpleLambda
 pytest tests/test_module.py::TestLambdaWithDependencies
 
 # Test error monitoring
-pytest tests/test_module.py::TestErrorMonitoring
+pytest tests/test_error_monitoring.py::TestErrorMonitoring
 
 # Test SNS integration
 pytest tests/test_module.py::TestSNSIntegration
