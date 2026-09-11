@@ -13,6 +13,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from botocore.client import BaseClient
 from infrahouse_core.timeout import timeout
 from pytest_infrahouse import terraform_apply
 
@@ -321,6 +322,139 @@ class TestErrorMonitoring:
             # Note: Alarm may be in ALARM or INSUFFICIENT_DATA state depending on timing
             alarm_state = alarms["MetricAlarms"][0]["StateValue"]
             assert alarm_state in ["ALARM", "INSUFFICIENT_DATA"]
+
+    def test_immediate_alert_late_error(
+        self,
+        test_module_dir: Path,
+        fixtures_dir: Path,
+        lambda_client: BaseClient,
+        cloudwatch_client: BaseClient,
+        keep_after: bool,
+        test_role_arn: str,
+    ) -> None:
+        """
+        Test immediate alert strategy fires on an error raised late in a long invocation (issue #33).
+
+        Lambda stamps an invocation's ``Errors`` datapoint with the minute the
+        invocation *started*, but publishes it only when the invocation *ends*.
+        Here the function (``timeout = 900``) raises 720 s into the run, so its
+        datapoint arrives about 12 minutes in the past. A single-period
+        ``errors-immediate`` alarm has already evaluated that minute as missing
+        data (not breaching) and never looks at it again, so the alarm stays OK
+        while the function fails.
+
+        720 s mirrors production, where an exception about 727 s into a run never
+        fired the alarm, while errors 1 to 3 minutes into a run did.
+
+        :param Path test_module_dir: Temporary test module directory
+        :param Path fixtures_dir: Path to Lambda fixtures
+        :param BaseClient lambda_client: Boto3 Lambda client fixture
+        :param BaseClient cloudwatch_client: Boto3 CloudWatch client fixture
+        :param bool keep_after: Whether to keep resources after test
+        :param str test_role_arn: IAM role ARN to assume for testing
+        """
+        function_name = "test-immediate-late-error"
+        lambda_source = fixtures_dir / "lambda_with_errors"
+        error_delay = 720
+        # How long CloudWatch gets to act on the Errors datapoint once it is queryable.
+        alarm_grace = 300
+
+        create_terraform_config(
+            test_module_dir,
+            lambda_source,
+            function_name,
+            "devnull@infrahouse.com",
+            "~> 6.0",
+            alert_strategy="immediate",
+            role_arn=test_role_arn,
+            timeout=900,
+        )
+
+        with terraform_apply(
+            str(test_module_dir),
+            destroy_after=not keep_after,
+            json_output=True,
+        ) as tf_output:
+            function_name_output = tf_output["lambda_function_name"]["value"]
+            alarm_name = f"{function_name}-errors-immediate"
+            invoked_at = datetime.now(timezone.utc)
+
+            # Invoke asynchronously, as a scheduler would. A synchronous call outlives
+            # botocore's read timeout, and botocore's retry would invoke the function again.
+            response = lambda_client.invoke(
+                FunctionName=function_name_output,
+                InvocationType="Event",
+                Payload=json.dumps({"force_error": True, "sleep_seconds": error_delay}),
+            )
+            assert response["StatusCode"] == 202
+
+            error_datapoint = None
+            with timeout(error_delay + 600):
+                while error_datapoint is None:
+                    stats = cloudwatch_client.get_metric_statistics(
+                        Namespace="AWS/Lambda",
+                        MetricName="Errors",
+                        Dimensions=[
+                            {"Name": "FunctionName", "Value": function_name_output}
+                        ],
+                        StartTime=invoked_at - timedelta(minutes=5),
+                        EndTime=datetime.now(timezone.utc) + timedelta(minutes=1),
+                        Period=60,
+                        Statistics=["Sum"],
+                    )
+                    error_datapoints = [
+                        dp for dp in stats["Datapoints"] if dp["Sum"] > 0
+                    ]
+                    if error_datapoints:
+                        error_datapoint = error_datapoints[0]
+                    else:
+                        LOG.info("Waiting for the late Errors datapoint...")
+                        time.sleep(30)
+
+            visible_at = datetime.now(timezone.utc)
+            LOG.info(
+                "Errors datapoint (Sum=%s) stamped %s became queryable at %s",
+                error_datapoint["Sum"],
+                error_datapoint["Timestamp"],
+                visible_at,
+            )
+            # Without this lateness the test would not exercise issue #33 at all.
+            assert visible_at - error_datapoint["Timestamp"] >= timedelta(
+                seconds=error_delay
+            ), (
+                f"Errors datapoint stamped {error_datapoint['Timestamp']} is not late "
+                f"(queryable at {visible_at}); Lambda no longer stamps it at invocation start"
+            )
+
+            # Read the alarm history, not the current state, so an ALARM that
+            # clears between polls still counts.
+            deadline = visible_at + timedelta(seconds=alarm_grace)
+            while True:
+                history = cloudwatch_client.describe_alarm_history(
+                    AlarmName=alarm_name,
+                    HistoryItemType="StateUpdate",
+                    StartDate=invoked_at,
+                )
+                alarm_fired = any(
+                    json.loads(item["HistoryData"])["newState"]["stateValue"] == "ALARM"
+                    for item in history["AlarmHistoryItems"]
+                )
+                if alarm_fired or datetime.now(timezone.utc) >= deadline:
+                    break
+                LOG.info("Waiting for %s to enter ALARM...", alarm_name)
+                time.sleep(30)
+
+            alarm = cloudwatch_client.describe_alarms(AlarmNames=[alarm_name])[
+                "MetricAlarms"
+            ][0]
+            assert alarm_fired, (
+                f"{alarm_name} never entered ALARM, although the function raised "
+                f"{error_delay}s into the invocation and Errors={error_datapoint['Sum']} "
+                f"is stamped {error_datapoint['Timestamp']}. "
+                f"Current state: {alarm['StateValue']} ({alarm['StateReason']}); "
+                f"EvaluationPeriods={alarm['EvaluationPeriods']}, "
+                f"DatapointsToAlarm={alarm.get('DatapointsToAlarm')}"
+            )
 
     def test_threshold_alert_strategy(
         self,

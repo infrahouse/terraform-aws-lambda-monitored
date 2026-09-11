@@ -46,6 +46,7 @@ def create_terraform_config(
     subnet_ids: list = None,
     security_group_ids: list = None,
     memory_utilization_threshold_percent: int = None,
+    timeout: int = None,
 ):
     """
     Create Terraform configuration files for testing the module.
@@ -67,6 +68,7 @@ def create_terraform_config(
     :param list security_group_ids: List of security group IDs for VPC configuration (optional)
     :param int memory_utilization_threshold_percent: Memory utilization alarm threshold (optional;
         when set, enables Lambda Insights and the memory alarm)
+    :param int timeout: Lambda function timeout in seconds (optional; module default when unset)
     """
     LOG.info("Creating Terraform root module in %s", module_dir)
 
@@ -205,6 +207,10 @@ def create_terraform_config(
     if memory_utilization_threshold_percent is not None:
         memory_config = f"memory_utilization_threshold_percent = {memory_utilization_threshold_percent}"
 
+    timeout_config = ""
+    if timeout is not None:
+        timeout_config = f"timeout           = {timeout}"
+
     main_tf = dedent(
         f"""
         {sg_resource}
@@ -216,6 +222,7 @@ def create_terraform_config(
           python_version    = "{python_version}"
           architecture      = "{architecture}"
           alert_strategy    = "{alert_strategy}"
+          {timeout_config}
 
           alarm_emails = ["{alarm_email}"]
 
