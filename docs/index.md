@@ -62,5 +62,6 @@ Head over to [Getting Started](getting-started.md) for prerequisites and a full 
 - [Getting Started](getting-started.md) — prerequisites, first deployment, tests
 - [Architecture](architecture.md) — how the module is put together
 - [Configuration](configuration.md) — all variables explained with examples
+- [Monitoring](monitoring.md) — how the alarms evaluate, and settings for scheduled or long-running functions
 - [Examples](examples.md) — common use cases
 - [Troubleshooting](troubleshooting.md) — what to check when something goes wrong

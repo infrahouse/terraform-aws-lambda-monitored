@@ -45,15 +45,17 @@ module "data_ingestion" {
 
   alert_strategy                 = "threshold"
   error_rate_threshold           = 5.0  # fire above 5% errors
-  error_rate_evaluation_periods  = 2    # over two 5-min windows
-  error_rate_datapoints_to_alarm = 2    # both windows must breach
+  error_rate_evaluation_periods  = 2    # over two 1-minute periods
+  error_rate_datapoints_to_alarm = 2    # both periods must breach
 
   alarm_emails = ["data-oncall@example.com"]
 }
 ```
 
 The `errors_threshold` alarm uses CloudWatch metric math: `(errors / invocations) * 100`. With `invocations = 0`
-the metric is treated as missing, not as a breach — idle functions won't page you.
+the metric is treated as missing, not as a breach — idle functions won't page you. The same rule means a function
+that runs less often than `error_rate_period` may never page you; see
+[Monitoring → Sparse invocations](monitoring.md#sparse-invocations).
 
 ## Custom permissions
 
