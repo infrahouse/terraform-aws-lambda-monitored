@@ -328,7 +328,9 @@ class TestErrorMonitoring:
         default 60-second period, a function that runs rarely produces one datapoint per
         run, and the previous run's datapoint has left the alarm's evaluation range by the
         time the next one arrives. CloudWatch fills the missing datapoint as not breaching,
-        so the alarm stays OK however many runs fail.
+        so the alarm stays OK however many runs fail. Sizing ``error_rate_period`` to the
+        gap between runs fixes it: each period holds one run, so two failed runs in a row
+        breach two periods.
 
         Two failing runs 9 minutes apart reproduce this. With 60-second periods, CloudWatch
         was measured to use datapoints up to 6 minutes old and to ignore anything older
@@ -357,6 +359,9 @@ class TestErrorMonitoring:
             "~> 6.0",
             alert_strategy="threshold",
             role_arn=test_role_arn,
+            # A period that spans the schedule is the fix for issue #25: each period then
+            # holds one run, and two failing runs in a row breach two periods.
+            error_rate_period=invocation_gap,
         )
 
         with terraform_apply(

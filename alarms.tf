@@ -35,7 +35,9 @@ resource "aws_cloudwatch_metric_alarm" "errors_immediate" {
 }
 
 # CloudWatch alarm for error rate threshold
-# Triggers when error rate exceeds configured threshold
+# Triggers when error rate exceeds configured threshold.
+# var.error_rate_period must span the function's invocation gap and its timeout, or the alarm
+# never collects enough breaching datapoints to fire (issue #25).
 resource "aws_cloudwatch_metric_alarm" "errors_threshold" {
   count = var.enable_error_alarms && var.alert_strategy == "threshold" ? 1 : 0
 
@@ -59,7 +61,7 @@ resource "aws_cloudwatch_metric_alarm" "errors_threshold" {
     metric {
       metric_name = "Errors"
       namespace   = "AWS/Lambda"
-      period      = 60
+      period      = var.error_rate_period
       stat        = "Sum"
 
       dimensions = {
@@ -74,7 +76,7 @@ resource "aws_cloudwatch_metric_alarm" "errors_threshold" {
     metric {
       metric_name = "Invocations"
       namespace   = "AWS/Lambda"
-      period      = 60
+      period      = var.error_rate_period
       stat        = "Sum"
 
       dimensions = {

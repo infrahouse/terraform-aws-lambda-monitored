@@ -124,6 +124,7 @@ module "lambda" {
 
   # Optional: For threshold strategy
   error_rate_threshold           = 5.0  # 5% error rate
+  error_rate_period              = 60   # raise to span the gap between runs of a scheduled function
   error_rate_evaluation_periods  = 2
   error_rate_datapoints_to_alarm = 2
 
@@ -516,6 +517,7 @@ Apache 2.0 — see [LICENSE](LICENSE).
 | <a name="input_environment_variables"></a> [environment\_variables](#input\_environment\_variables) | Map of environment variables for the Lambda function | `map(string)` | `{}` | no |
 | <a name="input_error_rate_datapoints_to_alarm"></a> [error\_rate\_datapoints\_to\_alarm](#input\_error\_rate\_datapoints\_to\_alarm) | Number of datapoints that must breach threshold to trigger alarm | `number` | `2` | no |
 | <a name="input_error_rate_evaluation_periods"></a> [error\_rate\_evaluation\_periods](#input\_error\_rate\_evaluation\_periods) | Number of evaluation periods for error rate alarm | `number` | `2` | no |
+| <a name="input_error_rate_period"></a> [error\_rate\_period](#input\_error\_rate\_period) | Length in seconds of one evaluation period for the 'threshold' error-rate alarm.<br/>Must be 60 or a multiple of 60.<br/><br/>Size it to the function's invocation pattern: at least the longest gap between invocations, and at least<br/>var.timeout. Lambda publishes a datapoint only for a minute in which an invocation started, and stamps it<br/>with that minute even though it arrives when the invocation ends. A period shorter than the gap between<br/>runs, or shorter than the timeout, leaves the alarm with too few datapoints to ever reach<br/>error\_rate\_datapoints\_to\_alarm, and it stays OK while the function fails.<br/><br/>See https://infrahouse.github.io/terraform-aws-lambda-monitored/monitoring/ | `number` | `60` | no |
 | <a name="input_error_rate_threshold"></a> [error\_rate\_threshold](#input\_error\_rate\_threshold) | Error rate percentage threshold for 'threshold' alert strategy (0-100) | `number` | `5` | no |
 | <a name="input_function_name"></a> [function\_name](#input\_function\_name) | Name of the Lambda function | `string` | n/a | yes |
 | <a name="input_handler"></a> [handler](#input\_handler) | Lambda function handler (format: file.function\_name) | `string` | `"main.lambda_handler"` | no |

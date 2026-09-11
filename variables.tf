@@ -177,6 +177,28 @@ variable "error_rate_threshold" {
   }
 }
 
+variable "error_rate_period" {
+  description = <<-EOT
+    Length in seconds of one evaluation period for the 'threshold' error-rate alarm.
+    Must be 60 or a multiple of 60.
+
+    Size it to the function's invocation pattern: at least the longest gap between invocations, and at least
+    var.timeout. Lambda publishes a datapoint only for a minute in which an invocation started, and stamps it
+    with that minute even though it arrives when the invocation ends. A period shorter than the gap between
+    runs, or shorter than the timeout, leaves the alarm with too few datapoints to ever reach
+    error_rate_datapoints_to_alarm, and it stays OK while the function fails.
+
+    See https://infrahouse.github.io/terraform-aws-lambda-monitored/monitoring/
+  EOT
+  type        = number
+  default     = 60
+
+  validation {
+    condition     = var.error_rate_period >= 60 && var.error_rate_period % 60 == 0
+    error_message = "error_rate_period must be 60 or a multiple of 60 seconds. Got: ${var.error_rate_period}"
+  }
+}
+
 variable "error_rate_evaluation_periods" {
   description = "Number of evaluation periods for error rate alarm"
   type        = number
