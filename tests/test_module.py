@@ -600,7 +600,7 @@ class TestVPCIntegration:
         # service_network has structure: {"subnet_private_ids": {"value": [...]}, ...}
         subnet_private_ids = service_network["subnet_private_ids"]["value"]
 
-        LOG.info(f"Using private subnets from service_network: {subnet_private_ids}")
+        LOG.info("Using private subnets from service_network: %s", subnet_private_ids)
 
         # Create Terraform config with VPC settings
         # The security group will be created by Terraform
@@ -628,12 +628,12 @@ class TestVPCIntegration:
             security_group_ids = tf_output["vpc_config_security_group_ids"]["value"]
             assert security_group_ids
             assert len(security_group_ids) == 1
-            LOG.info(f"Lambda using security group: {security_group_ids[0]}")
+            LOG.info("Lambda using security group: %s", security_group_ids[0])
 
             # Verify IAM role exists
             lambda_role_arn = tf_output["lambda_role_arn"]["value"]
             assert lambda_role_arn
-            LOG.info(f"Lambda IAM role: {lambda_role_arn}")
+            LOG.info("Lambda IAM role: %s", lambda_role_arn)
 
             # Invoke Lambda to trigger ENI creation and verify execution
             # This tests that the scoped IAM permissions actually work

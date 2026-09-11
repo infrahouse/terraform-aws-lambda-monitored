@@ -1,0 +1,13 @@
+[FORMAT]
+max-line-length=120
+
+[MESSAGES CONTROL]
+# The Python here is pytest integration tests. Fixtures arrive as test-method
+# arguments, test classes group a single scenario, and each test drives a full
+# apply-invoke-assert cycle, so these design checks flag pytest idioms rather
+# than problems.
+disable=
+    too-few-public-methods,
+    too-many-arguments,
+    too-many-locals,
+    too-many-positional-arguments,

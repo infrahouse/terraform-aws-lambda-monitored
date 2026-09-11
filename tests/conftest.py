@@ -1,3 +1,12 @@
+"""
+Shared pytest configuration for terraform-aws-lambda-monitored tests.
+
+Provides the Terraform root-module generator used by every test, the
+parametrized fixtures (AWS provider version, architecture, Python version,
+alert strategy), and boto3 clients built on the pytest-infrahouse session.
+"""
+
+import json
 import logging
 from pathlib import Path
 from textwrap import dedent
@@ -13,14 +22,14 @@ setup_logging(LOG, debug=True, debug_botocore=False)
 # Pytest hooks
 # More details on
 # https://pytest-with-eric.com/hooks/pytest-hooks/#Test-Running-runtest-Hooks
-def pytest_runtest_logstart(nodeid, location):
+def pytest_runtest_logstart(nodeid: str) -> None:
     """Log when a test starts."""
-    LOG.info(f"TEST STARTED: {nodeid}")
+    LOG.info("TEST STARTED: %s", nodeid)
 
 
-def pytest_runtest_logfinish(nodeid, location):
+def pytest_runtest_logfinish(nodeid: str) -> None:
     """Log when a test finishes."""
-    LOG.info(f"TEST ENDED: {nodeid}")
+    LOG.info("TEST ENDED: %s", nodeid)
 
 
 def create_terraform_config(
@@ -145,8 +154,6 @@ def create_terraform_config(
     (module_dir / "provider.tf").write_text(provider_tf)
 
     # Create main.tf with optional VPC configuration
-    import json
-
     # Create security group resource if VPC is configured
     sg_resource = ""
     vpc_config = ""
@@ -291,8 +298,10 @@ def create_terraform_config(
 
 
 # Parameterization for different test configurations
-@pytest.fixture(params=["~> 6.0"], ids=["provider-6.x"])
-def aws_provider_version(request):
+# Fixtures set name= so their functions don't share names with
+# create_terraform_config() arguments (pylint redefined-outer-name).
+@pytest.fixture(name="aws_provider_version", params=["~> 6.0"], ids=["provider-6.x"])
+def fixture_aws_provider_version(request):
     """
     AWS provider version to test.
 
@@ -303,8 +312,8 @@ def aws_provider_version(request):
     return request.param
 
 
-@pytest.fixture(params=["x86_64", "arm64"], ids=["x86", "arm64"])
-def architecture(request):
+@pytest.fixture(name="architecture", params=["x86_64", "arm64"], ids=["x86", "arm64"])
+def fixture_architecture(request):
     """
     Lambda function architecture to test.
 
@@ -316,10 +325,11 @@ def architecture(request):
 
 
 @pytest.fixture(
+    name="python_version",
     params=["python3.12", "python3.13"],
     ids=["py3.12", "py3.13"],
 )
-def python_version(request):
+def fixture_python_version(request):
     """
     Python runtime version to test.
 
@@ -330,8 +340,12 @@ def python_version(request):
     return request.param
 
 
-@pytest.fixture(params=["immediate", "threshold"], ids=["immediate", "threshold"])
-def alert_strategy(request):
+@pytest.fixture(
+    name="alert_strategy",
+    params=["immediate", "threshold"],
+    ids=["immediate", "threshold"],
+)
+def fixture_alert_strategy(request):
     """
     CloudWatch alarm alert strategy to test.
 
