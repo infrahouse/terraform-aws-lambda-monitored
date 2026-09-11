@@ -6,6 +6,7 @@ on demand, used for testing CloudWatch alarm functionality.
 """
 
 import json
+import time
 
 
 class IntentionalTestError(Exception):
@@ -25,7 +26,8 @@ def lambda_handler(event, context):
 
     This handler checks the event for a 'force_error' flag and raises
     an exception if present. Used for testing error monitoring and
-    CloudWatch alarm triggering.
+    CloudWatch alarm triggering. An optional 'sleep_seconds' delays the
+    outcome, simulating an error that surfaces late in a long invocation.
 
     :param dict event: Lambda event object containing request data
     :param LambdaContext context: Lambda context object with runtime information
@@ -47,6 +49,8 @@ def lambda_handler(event, context):
         ...
     IntentionalTestError: Intentional error for testing alarm functionality
     """
+    time.sleep(event.get("sleep_seconds", 0))
+
     # Check if we should force an error
     if event.get("force_error", False):
         raise IntentionalTestError("Intentional error for testing alarm functionality")
