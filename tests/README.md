@@ -34,7 +34,8 @@ tests/
 ├── test_module.py         # Main test suite
 ├── test_error_monitoring.py # Error alarm tests (immediate/threshold, late and sparse errors)
 ├── tools/                  # Diagnostics, not collected by pytest
-│   └── probe_alarm_range.py # Measures how far back CloudWatch alarms look for datapoints
+│   ├── probe_alarm_range.py # Measures how far back CloudWatch alarms look for datapoints
+│   └── probe_single_datapoint.py # Checks datapoints_to_alarm against breaching/missing periods
 ├── requirements.txt       # Test dependencies
 └── README.md             # This file
 ```
