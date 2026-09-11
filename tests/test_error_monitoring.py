@@ -20,6 +20,22 @@ from pytest_infrahouse import terraform_apply
 from tests.conftest import LOG, create_terraform_config
 
 
+def unique_function_name(prefix: str) -> str:
+    """
+    Build a function name no earlier run has used.
+
+    CloudWatch keeps metrics long after ``terraform destroy`` removes the function, and
+    they stay addressable under the same ``FunctionName`` dimension. A rerun that reuses
+    the name can therefore see the previous run's errors inside its alarm's window and
+    fire on them, so every test that judges alarm state takes a fresh name.
+
+    :param str prefix: Name prefix identifying the test
+    :return: Prefix plus a UTC timestamp
+    :rtype: str
+    """
+    return f"{prefix}-{datetime.now(timezone.utc):%H%M%S}"
+
+
 def wait_for_alarm_to_fire(
     cloudwatch_client: BaseClient,
     alarm_name: str,
@@ -82,7 +98,7 @@ class TestErrorMonitoring:
         :param cloudwatch_client: Boto3 CloudWatch client fixture
         :param bool keep_after: Whether to keep resources after test
         """
-        function_name = "test-immediate-alert"
+        function_name = unique_function_name("test-immediate-alert")
         lambda_source = fixtures_dir / "lambda_with_errors"
 
         create_terraform_config(
@@ -166,7 +182,7 @@ class TestErrorMonitoring:
         :param bool keep_after: Whether to keep resources after test
         :param str test_role_arn: IAM role ARN to assume for testing
         """
-        function_name = "test-immediate-late-error"
+        function_name = unique_function_name("test-immediate-late-error")
         lambda_source = fixtures_dir / "lambda_with_errors"
         error_delay = 720
         # How long CloudWatch gets to act on the Errors datapoint once it is queryable.
@@ -344,7 +360,7 @@ class TestErrorMonitoring:
         :param bool keep_after: Whether to keep resources after test
         :param str test_role_arn: IAM role ARN to assume for testing
         """
-        function_name = "test-threshold-sparse"
+        function_name = unique_function_name("test-threshold-sparse")
         lambda_source = fixtures_dir / "lambda_with_errors"
         invocation_gap = 540
         # How long CloudWatch gets to act on the second run's error once it is queryable.
