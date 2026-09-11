@@ -47,6 +47,7 @@ def create_terraform_config(
     security_group_ids: list = None,
     memory_utilization_threshold_percent: int = None,
     timeout: int = None,
+    error_rate_period: int = None,
 ):
     """
     Create Terraform configuration files for testing the module.
@@ -69,6 +70,7 @@ def create_terraform_config(
     :param int memory_utilization_threshold_percent: Memory utilization alarm threshold (optional;
         when set, enables Lambda Insights and the memory alarm)
     :param int timeout: Lambda function timeout in seconds (optional; module default when unset)
+    :param int error_rate_period: Error-rate alarm period in seconds (optional; module default when unset)
     """
     LOG.info("Creating Terraform root module in %s", module_dir)
 
@@ -211,6 +213,10 @@ def create_terraform_config(
     if timeout is not None:
         timeout_config = f"timeout           = {timeout}"
 
+    error_rate_period_config = ""
+    if error_rate_period is not None:
+        error_rate_period_config = f"error_rate_period = {error_rate_period}"
+
     main_tf = dedent(
         f"""
         {sg_resource}
@@ -230,6 +236,7 @@ def create_terraform_config(
           error_rate_threshold            = 5.0
           error_rate_evaluation_periods   = 2
           error_rate_datapoints_to_alarm  = 2
+          {error_rate_period_config}
           {memory_config}
           {vpc_config}
           tags = {{
