@@ -63,7 +63,17 @@ Look for `SubscriptionArn: PendingConfirmation`. Re-request the email via the co
 Expected. The alarm evaluates `ceil(timeout / 60) + 5` one-minute periods so it can catch errors that Lambda
 reports late in a long invocation, and it returns to `OK` only once the error's minute leaves that window: about
 6 minutes for a 60-second function, 20 minutes for a 900-second one. Errors inside that window don't send a new
-notification. See [Immediate alarm window](architecture.md#immediate-alarm-window).
+notification. See [Monitoring → Long-running invocations](monitoring.md#long-running-invocations).
+
+### `errors-threshold` stays OK although the function keeps failing
+
+Most often the function runs less often than `error_rate_period`. The threshold alarm needs M breaching datapoints,
+and a function scheduled every 30 minutes produces one datapoint per run, so with the default 60-second period the
+alarm can't collect two. Long runs have a similar effect: a run that ends many minutes after it started reports its
+errors too late to be judged.
+
+Set `error_rate_period` to at least the longest gap between invocations and at least `timeout`, or switch to
+`alert_strategy = "immediate"`. See [Monitoring → Sparse invocations](monitoring.md#sparse-invocations).
 
 ### PagerDuty / Slack topic in `alarm_topic_arns` doesn't receive events
 

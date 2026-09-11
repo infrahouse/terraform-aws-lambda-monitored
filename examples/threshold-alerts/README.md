@@ -408,9 +408,13 @@ terraform destroy
 
 ### No invocation data
 
-If invocation rate is very low (< 1/minute), consider:
-- Increasing evaluation period to 300 seconds (5 minutes)
+If the function runs less often than once a minute, the default 60-second period can leave the alarm unable to fire.
+Consider:
+- Setting `error_rate_period` to at least the longest gap between invocations, e.g. `error_rate_period = 300` for a
+  function invoked every 5 minutes
 - Using immediate strategy instead
+
+See [Monitoring → Sparse invocations](https://infrahouse.github.io/terraform-aws-lambda-monitored/monitoring/#sparse-invocations).
 
 ## Related Examples
 

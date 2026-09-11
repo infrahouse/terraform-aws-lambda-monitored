@@ -63,6 +63,7 @@ Full documentation is published to GitHub Pages:
 - [Getting Started](https://infrahouse.github.io/terraform-aws-lambda-monitored/getting-started/) — prerequisites and first deployment
 - [Architecture](https://infrahouse.github.io/terraform-aws-lambda-monitored/architecture/) — how the module is put together
 - [Configuration](https://infrahouse.github.io/terraform-aws-lambda-monitored/configuration/) — every variable explained
+- [Monitoring](https://infrahouse.github.io/terraform-aws-lambda-monitored/monitoring/) — how the alarms evaluate, and settings for scheduled or long-running functions
 - [Examples](https://infrahouse.github.io/terraform-aws-lambda-monitored/examples/) — common usage patterns
 - [Troubleshooting](https://infrahouse.github.io/terraform-aws-lambda-monitored/troubleshooting/) — common issues and fixes
 

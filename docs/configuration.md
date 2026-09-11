@@ -75,12 +75,13 @@ Pick **one** strategy based on expected error volume:
 | `enable_error_alarms` | `bool` | `true` | Set to `false` to skip the error alarm entirely. |
 | `alert_strategy` | `string` | `immediate` | `immediate` fires on any error; `threshold` fires on error *rate*. |
 | `error_rate_threshold` | `number` | `5.0` | Percent. Only used when `alert_strategy = "threshold"`. |
+| `error_rate_period` | `number` | `60` | Seconds, a multiple of 60. Threshold strategy only. Must be at least the longest gap between invocations and at least `timeout`, or the alarm may never fire. |
 | `error_rate_evaluation_periods` | `number` | `2` | Threshold strategy only. |
 | `error_rate_datapoints_to_alarm` | `number` | `2` | Threshold strategy only. |
 
 **Rule of thumb:** use `immediate` for low-traffic or critical-path functions (cron jobs, deploy hooks) where any
 error is a page. Use `threshold` for high-volume functions that tolerate occasional failures (webhook ingesters,
-retryable workers).
+retryable workers). For scheduled or long-running functions, see [Monitoring](monitoring.md#choosing-settings).
 
 ## Alerting — other alarms
 
