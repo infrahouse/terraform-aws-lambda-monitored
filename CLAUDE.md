@@ -23,6 +23,7 @@ All day-to-day tasks go through the Makefile (`make help` lists targets):
 - `make format` — `terraform fmt -recursive` + `black tests/`
 - `make test` — runs the full integration suite (`test-simple`, `test-deps`, `test-monitoring`, `test-sns`, `test-vpc`)
 - `make test-<suite>` — run one suite (e.g. `make test-simple`); suites map to `Test*` classes in `tests/test_module.py`
+  (`TestErrorMonitoring` lives in `tests/test_error_monitoring.py`)
 - `make release-{patch,minor,major}` — bumps version via `.bumpversion.cfg`, edits `CHANGELOG.md`, commits, tags;
   requires being on `main`
 

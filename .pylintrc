@@ -1,6 +1,10 @@
 [FORMAT]
 max-line-length=120
 
+[SIMILARITIES]
+# Test modules repeat the create_terraform_config() / terraform_apply() setup; matches infrahouse-core.
+min-similarity-lines=10
+
 [MESSAGES CONTROL]
 # The Python here is pytest integration tests. Fixtures arrive as test-method
 # arguments, test classes group a single scenario, and each test drives a full

@@ -59,7 +59,7 @@ test-manylinux217:  ## Run manylinux_2_17-only wheel packaging tests (issue #31)
 
 .PHONY: test-monitoring
 test-monitoring:  ## Run error monitoring tests (use TEST_SELECTOR to filter)
-	$(call run_pytest,TestErrorMonitoring,tests/test_module.py)
+	$(call run_pytest,TestErrorMonitoring,tests/test_error_monitoring.py)
 
 .PHONY: test-memory
 test-memory:  ## Run memory utilization monitoring tests (use TEST_SELECTOR to filter)
