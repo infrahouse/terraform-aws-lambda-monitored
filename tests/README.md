@@ -33,6 +33,8 @@ tests/
 │   └── lambda_with_errors/ # Lambda that can simulate errors
 ├── test_module.py         # Main test suite
 ├── test_error_monitoring.py # Error alarm tests (immediate/threshold, late and sparse errors)
+├── tools/                  # Diagnostics, not collected by pytest
+│   └── probe_alarm_range.py # Measures how far back CloudWatch alarms look for datapoints
 ├── requirements.txt       # Test dependencies
 └── README.md             # This file
 ```
