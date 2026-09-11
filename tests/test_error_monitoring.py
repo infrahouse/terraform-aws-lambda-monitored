@@ -311,3 +311,123 @@ class TestErrorMonitoring:
             # Verify alarm was created
             assert tf_output["error_alarm_arn"]["value"]
             assert "threshold" in tf_output["error_alarm_arn"]["value"]
+
+    def test_threshold_alert_sparse_invocations(
+        self,
+        test_module_dir: Path,
+        fixtures_dir: Path,
+        lambda_client: BaseClient,
+        cloudwatch_client: BaseClient,
+        keep_after: bool,
+        test_role_arn: str,
+    ) -> None:
+        """
+        Test threshold alert strategy fires for a sparse function that fails on every run (issue #25).
+
+        The threshold alarm needs 2 breaching error-rate datapoints (N = M = 2). With the
+        default 60-second period, a function that runs rarely produces one datapoint per
+        run, and the previous run's datapoint has left the alarm's evaluation range by the
+        time the next one arrives. CloudWatch fills the missing datapoint as not breaching,
+        so the alarm stays OK however many runs fail.
+
+        Two failing runs 9 minutes apart reproduce this. With 60-second periods, CloudWatch
+        was measured to use datapoints up to 6 minutes old and to ignore anything older
+        (backdated custom metrics, 2026-09-11), so 9 minutes puts the first run's datapoint
+        out of reach with margin to spare.
+
+        :param Path test_module_dir: Temporary test module directory
+        :param Path fixtures_dir: Path to Lambda fixtures
+        :param BaseClient lambda_client: Boto3 Lambda client fixture
+        :param BaseClient cloudwatch_client: Boto3 CloudWatch client fixture
+        :param bool keep_after: Whether to keep resources after test
+        :param str test_role_arn: IAM role ARN to assume for testing
+        """
+        function_name = "test-threshold-sparse"
+        lambda_source = fixtures_dir / "lambda_with_errors"
+        invocation_gap = 540
+        # How long CloudWatch gets to act on the second run's error once it is queryable.
+        # A firing alarm transitions within about a minute of the datapoint landing.
+        alarm_grace = 180
+
+        create_terraform_config(
+            test_module_dir,
+            lambda_source,
+            function_name,
+            "devnull@infrahouse.com",
+            "~> 6.0",
+            alert_strategy="threshold",
+            role_arn=test_role_arn,
+        )
+
+        with terraform_apply(
+            str(test_module_dir),
+            destroy_after=not keep_after,
+            json_output=True,
+        ) as tf_output:
+            function_name_output = tf_output["lambda_function_name"]["value"]
+            alarm_name = f"{function_name}-errors-threshold"
+
+            invoked_at = []
+            for run in range(2):
+                if run:
+                    LOG.info("Next failing run in %d s", invocation_gap)
+                    time.sleep(invocation_gap)
+                invoked_at.append(datetime.now(timezone.utc))
+                response = lambda_client.invoke(
+                    FunctionName=function_name_output,
+                    InvocationType="RequestResponse",
+                    Payload=json.dumps({"force_error": True}),
+                )
+                assert "FunctionError" in response
+
+            error_datapoints = []
+            with timeout(600):
+                while len(error_datapoints) < 2:
+                    stats = cloudwatch_client.get_metric_statistics(
+                        Namespace="AWS/Lambda",
+                        MetricName="Errors",
+                        Dimensions=[
+                            {"Name": "FunctionName", "Value": function_name_output}
+                        ],
+                        StartTime=invoked_at[0] - timedelta(minutes=5),
+                        EndTime=datetime.now(timezone.utc) + timedelta(minutes=1),
+                        Period=60,
+                        Statistics=["Sum"],
+                    )
+                    error_datapoints = sorted(
+                        (dp for dp in stats["Datapoints"] if dp["Sum"] > 0),
+                        key=lambda dp: dp["Timestamp"],
+                    )
+                    if len(error_datapoints) < 2:
+                        LOG.info("Waiting for both runs' Errors datapoints...")
+                        time.sleep(30)
+
+            visible_at = datetime.now(timezone.utc)
+            error_stamps = ", ".join(str(dp["Timestamp"]) for dp in error_datapoints)
+            LOG.info(
+                "Errors datapoints stamped %s queryable by %s", error_stamps, visible_at
+            )
+
+            fired_at = wait_for_alarm_to_fire(
+                cloudwatch_client,
+                alarm_name,
+                since=invoked_at[0],
+                deadline=visible_at + timedelta(seconds=alarm_grace),
+            )
+
+            alarm = cloudwatch_client.describe_alarms(AlarmNames=[alarm_name])[
+                "MetricAlarms"
+            ][0]
+            errors_period = next(
+                query["MetricStat"]["Period"]
+                for query in alarm["Metrics"]
+                if query["Id"] == "errors"
+            )
+            assert fired_at is not None, (
+                f"{alarm_name} never entered ALARM, although both runs failed "
+                f"{invocation_gap}s apart (Errors stamped {error_stamps}). "
+                f"Current state: {alarm['StateValue']} ({alarm['StateReason']}); "
+                f"Period={errors_period}, EvaluationPeriods={alarm['EvaluationPeriods']}, "
+                f"DatapointsToAlarm={alarm.get('DatapointsToAlarm')}"
+            )
+            LOG.info("%s entered ALARM at %s", alarm_name, fired_at)
