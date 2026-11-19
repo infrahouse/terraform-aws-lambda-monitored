@@ -85,8 +85,7 @@ def create_terraform_config(
         pass
 
     # Create terraform.tf
-    terraform_tf = dedent(
-        f"""
+    terraform_tf = dedent(f"""
         terraform {{
           required_version = "~> 1.0"
 
@@ -97,15 +96,13 @@ def create_terraform_config(
             }}
           }}
         }}
-        """
-    )
+        """)
     (module_dir / "terraform.tf").write_text(terraform_tf)
 
     # Create variables.tf with optional VPC variables
     vpc_variables = ""
     if subnet_ids and security_group_ids is None:
-        vpc_variables = dedent(
-            """
+        vpc_variables = dedent("""
             variable "subnet_ids" {
               description = "List of subnet IDs for Lambda VPC configuration"
               type        = list(string)
@@ -115,11 +112,9 @@ def create_terraform_config(
               description = "Lambda function name"
               type        = string
             }
-            """
-        )
+            """)
 
-    variables_tf = dedent(
-        f"""
+    variables_tf = dedent(f"""
         variable "region" {{
           description = "AWS region"
           type        = string
@@ -132,13 +127,11 @@ def create_terraform_config(
         }}
 
         {vpc_variables}
-        """
-    )
+        """)
     (module_dir / "variables.tf").write_text(variables_tf)
 
     # Create provider.tf
-    provider_tf = dedent(
-        """
+    provider_tf = dedent("""
         provider "aws" {
           region = var.region
           dynamic "assume_role" {
@@ -153,8 +146,7 @@ def create_terraform_config(
             }
           }
         }
-        """
-    )
+        """)
     (module_dir / "provider.tf").write_text(provider_tf)
 
     # Create main.tf with optional VPC configuration
@@ -163,8 +155,7 @@ def create_terraform_config(
     vpc_config = ""
     if subnet_ids and security_group_ids is None:
         # Create security group in Terraform when VPC is configured
-        sg_resource = dedent(
-            """
+        sg_resource = dedent("""
             # Get VPC ID from subnet
             data "aws_subnet" "selected" {
               id = var.subnet_ids[0]
@@ -188,8 +179,7 @@ def create_terraform_config(
                 created_by = "terraform-aws-lambda-monitored-test"
               }
             }
-            """
-        )
+            """)
         vpc_config = """
           # VPC Configuration
           lambda_subnet_ids         = var.subnet_ids
@@ -217,8 +207,7 @@ def create_terraform_config(
     if error_rate_period is not None:
         error_rate_period_config = f"error_rate_period = {error_rate_period}"
 
-    main_tf = dedent(
-        f"""
+    main_tf = dedent(f"""
         {sg_resource}
         module "lambda_monitored" {{
           source = "./.."  # Points to the root module
@@ -243,13 +232,11 @@ def create_terraform_config(
             environment = "development"
           }}
         }}
-        """
-    )
+        """)
     (module_dir / "main.tf").write_text(main_tf)
 
     # Create outputs.tf
-    outputs_tf = dedent(
-        """
+    outputs_tf = dedent("""
         output "lambda_function_arn" {
           value = module.lambda_monitored.lambda_function_arn
         }
@@ -297,8 +284,7 @@ def create_terraform_config(
         output "lambda_insights_layer_arn" {
           value = module.lambda_monitored.lambda_insights_layer_arn
         }
-        """
-    )
+        """)
     (module_dir / "outputs.tf").write_text(outputs_tf)
 
     # Create terraform.tfvars
