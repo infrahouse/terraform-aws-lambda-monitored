@@ -25,7 +25,8 @@ The packaging script fails fast with an install hint if any of these are missing
 The role that runs Terraform needs enough permissions to manage:
 
 - `lambda:*` on the target function
-- `iam:*Role*` and `iam:*Policy*` on `${function_name}-*` roles
+- `iam:*Role*` and `iam:*Policy*` on the execution role: `${function_name}-*` by default (with the first 37
+  characters of `function_name`), or `${role_name_prefix}*` when `role_name_prefix` is set
 - `s3:*` on the deployment bucket (the module creates it via `infrahouse/s3-bucket/aws`)
 - `logs:*` on `/aws/lambda/${function_name}`
 - `cloudwatch:PutMetricAlarm` / `DeleteAlarms`
