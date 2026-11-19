@@ -149,8 +149,9 @@ role:
 make test-simple TEST_ROLE=arn:aws:iam::<your-account>:role/<your-tester-role>
 ```
 
-The role needs `lambda:*`, `iam:*Role*`/`*Policy*` on `${function_name}-*`, `s3:*` on the deployment bucket,
-`logs:*`, `cloudwatch:*Alarm*`, `sns:*`, and `ec2:*NetworkInterface*` for VPC tests.
+The role needs `lambda:*`, `iam:*Role*`/`*Policy*` on the execution role (`${function_name}-*` by default, with
+the first 37 characters of the name, or `${role_name_prefix}*` when the input is set), `s3:*` on the deployment
+bucket, `logs:*`, `cloudwatch:*Alarm*`, `sns:*`, and `ec2:*NetworkInterface*` for VPC tests.
 
 ### Tests leave resources behind
 
