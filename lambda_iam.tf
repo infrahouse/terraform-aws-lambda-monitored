@@ -14,9 +14,20 @@ data "aws_iam_policy_document" "lambda_assume_role" {
   }
 }
 
+locals {
+  # name_prefix forces replacement, so the null branch must stay byte-for-byte the expression the
+  # module used before role_name_prefix existed: any change would replace every caller's role.
+  # 37 characters plus "-" fills the 38 that AWS's 64-character limit leaves after the 26-character suffix.
+  role_name_prefix = (
+    var.role_name_prefix != null
+    ? var.role_name_prefix
+    : "${substr(var.function_name, 0, min(length(var.function_name), 37))}-"
+  )
+}
+
 # IAM role for Lambda execution
 resource "aws_iam_role" "lambda" {
-  name_prefix = "${substr(var.function_name, 0, min(length(var.function_name), 37))}-"
+  name_prefix = local.role_name_prefix
 
   assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
 
