@@ -9,7 +9,7 @@ this page adds commentary on *when* and *why* you'd override each one.
 
 | Variable | Type | Default | Notes |
 |----------|------|---------|-------|
-| `function_name` | `string` | — (required) | Alphanumerics, `-`, `_`. Long names still work, but the IAM role uses a truncated `name_prefix` (see [Architecture](architecture.md#iam-role-naming)). |
+| `function_name` | `string` | — (required) | Alphanumerics, `-`, `_`. Long names still work, but unless `role_name_prefix` is set the IAM role uses a truncated `name_prefix` (see [Architecture](architecture.md#iam-role-naming)). |
 | `lambda_source_dir` | `string` | — (required) | Directory containing `main.py` (and optionally `requirements.txt`). Resolved relative to the caller's module. |
 | `handler` | `string` | `main.lambda_handler` | Format is `file.function`, so `handler.process` means `handler.py::process`. |
 | `description` | `string` | `null` | Shown in the Lambda console. |
@@ -38,6 +38,7 @@ See [Architecture → Packaging pipeline](architecture.md#packaging-pipeline) fo
 | Variable | Type | Default | Notes |
 |----------|------|---------|-------|
 | `additional_iam_policy_arns` | `list(string)` | `[]` | Attach any number of AWS-managed or custom policies. One attachment per ARN. |
+| `role_name_prefix` | `string` | `null` | Used verbatim as the execution role's `name_prefix` (1–38 chars of `[\w+=,.@-]`; add your own trailing `-`). Set it when a policy matches the role by name pattern. `null` derives the prefix from `function_name`. Setting or changing it replaces the role. See [Architecture](architecture.md#iam-role-naming). |
 | `kms_key_id` | `string` | `null` | KMS key ARN for CloudWatch Logs + SNS encryption. Key policy must allow `logs.<region>.amazonaws.com` and `sns.amazonaws.com`. |
 
 ## VPC

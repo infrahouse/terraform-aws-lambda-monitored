@@ -95,10 +95,25 @@ but if you've wired the Lambda into a custom role, re-apply — the second run a
 
 ### Role name shows up truncated
 
-Expected. The execution role uses `name_prefix = substr(function_name, 0, 37)`. See
-[Architecture → IAM role naming](architecture.md#iam-role-naming). The full function name is preserved in
-tags, and downstream callers should use the `lambda_role_arn` / `lambda_role_name` outputs rather than
-reconstructing the name from `function_name`.
+Expected when `role_name_prefix` is unset: the execution role's `name_prefix` is then the first 37 characters of
+`function_name` plus `-`. See [Architecture → IAM role naming](architecture.md#iam-role-naming). The full function
+name is preserved in tags. To choose how the role name starts, set `role_name_prefix`. Either way, downstream callers
+should use the `lambda_role_arn` / `lambda_role_name` outputs rather than reconstructing the name.
+
+### `Invalid value for variable` on `role_name_prefix`
+
+The plan fails before anything is created when `role_name_prefix` is not 1–38 characters from the IAM role name set
+(letters, digits and `+=,.@_-`). Common causes:
+
+- An empty string. Use `null` to get the default prefix derived from `function_name`.
+- More than 38 characters. AWS caps role names at 64 and Terraform appends 26.
+- A character IAM doesn't allow in names, such as `*` copied from an `ArnLike` pattern, or `/` from a role path.
+
+### Setting `role_name_prefix` replaces the execution role
+
+Expected. Role names can't change in place, so setting, changing or removing `role_name_prefix` on an existing
+deployment makes Terraform replace `aws_iam_role.lambda` and update the function to use the new role. Leave it unset
+to keep the existing role.
 
 ## VPC
 
