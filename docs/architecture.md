@@ -13,7 +13,7 @@ dashed lines are optional or conditional on variable values.
 | `aws_lambda_function_event_invoke_config.this` | `lambda.tf` | 1 | Disables async retries by default. |
 | `module.lambda_bucket` | `lambda_s3.tf` | 1 | S3 bucket for deployment packages (via `infrahouse/s3-bucket`). |
 | `aws_s3_object.lambda_package` | `lambda_s3.tf` | 1 | Uploaded zip. Key includes a content hash so uploads are immutable. |
-| `aws_iam_role.lambda` | `lambda_iam.tf` | 1 | Execution role, `name_prefix`-ed so long function names still fit in 38 chars. |
+| `aws_iam_role.lambda` | `lambda_iam.tf` | 1 | Execution role, `name_prefix`-ed: `role_name_prefix` if set, else the function name cut to fit 38 chars. |
 | `aws_iam_role_policy.lambda_logging` | `lambda_iam.tf` | 1 | Write logs to the function's log group only. |
 | `aws_iam_role_policy.lambda_vpc_access` | `lambda_iam.tf` | 0 or 1 | ENI lifecycle in specified subnets only, when `lambda_subnet_ids` is set. |
 | `aws_iam_role_policy_attachment.additional` | `lambda_iam.tf` | N | One per ARN in `additional_iam_policy_arns`. |
@@ -95,13 +95,24 @@ sizes its window from `timeout`; `errors_threshold` needs `error_rate_period` si
 
 ## IAM role naming
 
-The execution role uses `name_prefix = "${substr(var.function_name, 0, 37)}-"`. This is because:
+The execution role is created with `name_prefix`, so its length is bounded:
 
 - AWS limits IAM role names to 64 characters
 - `name_prefix` appends a 26-character unique suffix
-- So the prefix must fit in `64 - 26 = 38` characters, including the trailing `-`
+- So the prefix must fit in `64 - 26 = 38` characters
 
-Function names longer than 37 characters still work — the role is created under a truncated prefix —
-but **the full function name is preserved in tags**. Downstream callers should always use the
-`lambda_role_arn` / `lambda_role_name` outputs rather than trying to reconstruct the role name
-from `function_name`.
+Where the prefix comes from depends on `role_name_prefix`:
+
+- **Unset (`null`, the default).** The module derives it from the function name:
+  `name_prefix = "${substr(var.function_name, 0, min(length(var.function_name), 37))}-"`, i.e. the first 37
+  characters and a trailing `-`. This expression is unchanged from before `role_name_prefix` existed, so upgrading
+  doesn't replace existing roles. Function names longer than 37 characters still work — the role is created under
+  a truncated prefix — but **the full function name is preserved in tags**.
+- **Set.** The value is used verbatim as `name_prefix`; the module adds no separator. Validation accepts 1–38
+  characters from the IAM role name set (`[\w+=,.@-]`) and fails at plan otherwise. Use it when something has to
+  match the role by name pattern, for example an `ArnLike` condition on `aws:PrincipalArn` in a resource-based
+  policy.
+
+`name_prefix` can't change in place, so setting, changing or removing `role_name_prefix` replaces the role.
+Downstream callers should always use the `lambda_role_arn` / `lambda_role_name` outputs rather than trying to
+reconstruct the role name from `function_name` or `role_name_prefix`.

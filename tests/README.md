@@ -150,6 +150,16 @@ A Lambda function that can simulate errors when invoked with `force_error: true`
 
 **test_lambda_invocation**: Tests that the Lambda function executes successfully and returns expected output.
 
+**test_role_name_prefix_set**: Applies with a 38-character `role_name_prefix` and checks that the role the function
+runs as, as AWS reports it, is the prefix plus Terraform's 26-character suffix.
+
+**test_role_name_prefix_unset**: Without `role_name_prefix`, checks the role keeps the default name (function name cut
+to 37 characters plus `-`) for a short and a long function name, with the full name in the `function_name` tag.
+
+**test_role_name_prefix_validation_accepts** / **test_role_name_prefix_validation_rejects**: Run `terraform plan`
+only, creating nothing. `null` and a 38-character prefix pass; an empty string, 39 characters and `*` fail on the
+variable's validation rule.
+
 ### TestLambdaWithDependencies
 
 **test_dependency_packaging**: Validates that platform-specific dependencies are packaged correctly for the target architecture.

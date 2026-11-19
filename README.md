@@ -325,7 +325,31 @@ triggers the alarm when any invocation uses more than ~205 MB.
 
 ### IAM Role Naming
 
-If your `function_name` exceeds 37 characters, the IAM role name will be truncated to comply with AWS's 38-character `name_prefix` limit. The full function name is always preserved in the IAM role's `function_name` tag for identification purposes.
+The execution role is created with `name_prefix`: Terraform appends a 26-character unique suffix, and AWS limits
+role names to 64 characters, so the prefix can be at most 38 characters.
+
+- **`role_name_prefix` unset (default):** the prefix is `function_name` plus `-`. If your `function_name` exceeds
+  37 characters, it is truncated to its first 37 to fit the limit. The full function name is always preserved in the
+  IAM role's `function_name` tag for identification purposes.
+- **`role_name_prefix` set:** the value is used verbatim as the prefix. The module adds nothing to it, so end it with
+  a separator such as `-` if you want one. It must be 1–38 characters from the IAM role name set: letters, digits
+  and `+=,.@_-`. Use it when a policy selects principals by role name pattern, for example `ArnLike` on
+  `aws:PrincipalArn`:
+
+  ```hcl
+  module "scaler" {
+    source  = "registry.infrahouse.com/infrahouse/lambda-monitored/aws"
+    version = "2.1.0"
+
+    function_name    = "scaler"
+    role_name_prefix = "actions-runner-lambda-pool1-scaler-"
+    # ...
+  }
+  # A resource policy can then match arn:aws:iam::<account>:role/actions-runner-lambda-*
+  ```
+
+Setting, changing or removing `role_name_prefix` on an existing deployment replaces the execution role, because IAM
+role names can't be changed in place.
 
 **Best Practice:** Reference the IAM role using the module outputs (`lambda_role_arn` or `lambda_role_name`) rather than constructing the role name manually.
 
