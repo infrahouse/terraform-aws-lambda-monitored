@@ -8,13 +8,80 @@ This module tests the Lambda monitoring module across different configurations:
 """
 
 import json
+import subprocess
 import time
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from typing import Any, List
 
+import pytest
 from infrahouse_core.timeout import timeout
 from pytest_infrahouse import terraform_apply
 
 from tests.conftest import LOG, create_terraform_config
+
+# Terraform appends this many characters to a name_prefix to make the name unique.
+NAME_PREFIX_SUFFIX_LENGTH = 26
+
+# The longest prefix the module accepts: AWS caps role names at 64 characters, and 64 - 26 = 38.
+# It uses every non-alphanumeric character of the IAM role-name set, so AWS confirms both limits.
+ROLE_NAME_PREFIX_MAX = "test-rnp.set+role=name,prefix@ci_0001-"
+
+
+def terraform_plan(module_dir: Path) -> subprocess.CompletedProcess:
+    """
+    Initialise the root module in module_dir and plan it, without applying anything.
+
+    ``-refresh=false`` keeps the plan from reading back whatever an earlier ``--keep-after``
+    run left in the state: the callers only care whether the inputs pass validation.
+
+    :param Path module_dir: Directory with the generated root module
+    :return: The finished ``terraform plan -json`` process; stdout holds one JSON message per line
+    :rtype: subprocess.CompletedProcess
+    :raise subprocess.CalledProcessError: If ``terraform init`` fails
+    """
+    subprocess.run(
+        ["terraform", "init", "-no-color", "-input=false"],
+        cwd=module_dir,
+        check=True,
+    )
+    return subprocess.run(
+        [
+            "terraform",
+            "plan",
+            "-json",
+            "-input=false",
+            "-refresh=false",
+            "-var-file=terraform.tfvars",
+        ],
+        cwd=module_dir,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+def variable_validation_errors(plan_stdout: str, variable: str) -> List[str]:
+    """
+    Collect the failed validation rules of one variable from ``terraform plan -json`` output.
+
+    :param str plan_stdout: Standard output of ``terraform plan -json``
+    :param str variable: Variable name the error detail must mention
+    :return: Detail text of every "Invalid value for variable" error that mentions the variable
+    :rtype: list
+    """
+    errors = []
+    for line in plan_stdout.splitlines():
+        if not line.strip():
+            continue
+        diagnostic = json.loads(line).get("diagnostic", {})
+        if (
+            diagnostic.get("severity") == "error"
+            and diagnostic.get("summary") == "Invalid value for variable"
+            and variable in diagnostic.get("detail", "")
+        ):
+            errors.append(diagnostic["detail"])
+    return errors
 
 
 class TestSimpleLambda:
@@ -137,6 +204,227 @@ class TestSimpleLambda:
             payload = json.loads(response["Payload"].read())
             assert payload["statusCode"] == 200
             assert "Hello from Lambda!" in payload["body"]
+
+    def test_role_name_prefix_set(
+        self,
+        test_module_dir: Path,
+        fixtures_dir: Path,
+        aws_provider_version: str,
+        aws_region: str,
+        iam_client: Any,
+        lambda_client: Any,
+        keep_after: bool,
+        test_role_arn: str,
+    ) -> None:
+        """
+        Test that role_name_prefix becomes the start of the execution role's name.
+
+        The prefix is 38 characters, the most the module accepts, and uses every
+        non-alphanumeric character of the IAM role-name set.
+
+        :param Path test_module_dir: Temporary test module directory
+        :param Path fixtures_dir: Path to Lambda fixtures
+        :param str aws_provider_version: AWS provider version to test
+        :param str aws_region: AWS region to deploy to
+        :param iam_client: Boto3 IAM client fixture
+        :param lambda_client: Boto3 Lambda client fixture
+        :param bool keep_after: Whether to keep resources after test
+        :param str test_role_arn: IAM role ARN for testing
+        """
+        function_name = "test-role-prefix-set"
+
+        create_terraform_config(
+            test_module_dir,
+            fixtures_dir / "simple_lambda",
+            function_name,
+            "devnull@infrahouse.com",
+            aws_provider_version,
+            aws_region=aws_region,
+            role_arn=test_role_arn,
+            role_name_prefix=ROLE_NAME_PREFIX_MAX,
+        )
+
+        with terraform_apply(
+            str(test_module_dir),
+            destroy_after=not keep_after,
+            json_output=True,
+        ) as tf_output:
+            output_role_name = tf_output["lambda_role_name"]["value"]
+
+            # Ask AWS which role the function runs as, independently of the Terraform output.
+            role_arn = lambda_client.get_function_configuration(
+                FunctionName=function_name
+            )["Role"]
+            aws_role_name = iam_client.get_role(RoleName=role_arn.split("/")[-1])[
+                "Role"
+            ]["RoleName"]
+            assert aws_role_name == output_role_name
+
+            assert aws_role_name.startswith(ROLE_NAME_PREFIX_MAX), aws_role_name
+            assert (
+                len(aws_role_name)
+                == len(ROLE_NAME_PREFIX_MAX) + NAME_PREFIX_SUFFIX_LENGTH
+            ), aws_role_name
+
+    @pytest.mark.parametrize(
+        "function_name, expected_prefix",
+        [
+            ("test-role-default-short", "test-role-default-short-"),
+            # 48 characters: the prefix keeps the first 37 and appends "-".
+            (
+                "test-role-default-truncates-a-long-function-name",
+                "test-role-default-truncates-a-long-fu-",
+            ),
+        ],
+        ids=["short-name", "long-name"],
+    )
+    def test_role_name_prefix_unset(
+        self,
+        test_module_dir: Path,
+        fixtures_dir: Path,
+        aws_provider_version: str,
+        aws_region: str,
+        iam_client: Any,
+        lambda_client: Any,
+        keep_after: bool,
+        test_role_arn: str,
+        function_name: str,
+        expected_prefix: str,
+    ) -> None:
+        """
+        Test that without role_name_prefix the role is named as before the input existed.
+
+        The prefix is the function name, cut to 37 characters, plus "-". The full function
+        name stays readable in the role's function_name tag.
+
+        :param Path test_module_dir: Temporary test module directory
+        :param Path fixtures_dir: Path to Lambda fixtures
+        :param str aws_provider_version: AWS provider version to test
+        :param str aws_region: AWS region to deploy to
+        :param iam_client: Boto3 IAM client fixture
+        :param lambda_client: Boto3 Lambda client fixture
+        :param bool keep_after: Whether to keep resources after test
+        :param str test_role_arn: IAM role ARN for testing
+        :param str function_name: Lambda function name to deploy
+        :param str expected_prefix: Role name prefix the module must derive from function_name
+        """
+        create_terraform_config(
+            test_module_dir,
+            fixtures_dir / "simple_lambda",
+            function_name,
+            "devnull@infrahouse.com",
+            aws_provider_version,
+            aws_region=aws_region,
+            role_arn=test_role_arn,
+        )
+
+        with terraform_apply(
+            str(test_module_dir),
+            destroy_after=not keep_after,
+            json_output=True,
+        ) as tf_output:
+            output_role_name = tf_output["lambda_role_name"]["value"]
+
+            # Ask AWS which role the function runs as, independently of the Terraform output.
+            role_arn = lambda_client.get_function_configuration(
+                FunctionName=function_name
+            )["Role"]
+            role = iam_client.get_role(RoleName=role_arn.split("/")[-1])["Role"]
+            assert role["RoleName"] == output_role_name
+
+            assert role["RoleName"].startswith(expected_prefix), role["RoleName"]
+            assert (
+                len(role["RoleName"])
+                == len(expected_prefix) + NAME_PREFIX_SUFFIX_LENGTH
+            ), role["RoleName"]
+
+            tags = {tag["Key"]: tag["Value"] for tag in role.get("Tags", [])}
+            assert tags.get("function_name") == function_name, tags
+
+    @pytest.mark.parametrize(
+        "role_name_prefix",
+        # None leaves the argument out, so the module gets its default, null.
+        [None, ROLE_NAME_PREFIX_MAX],
+        ids=["null", "38-chars"],
+    )
+    def test_role_name_prefix_validation_accepts(
+        self,
+        test_module_dir: Path,
+        fixtures_dir: Path,
+        aws_provider_version: str,
+        aws_region: str,
+        test_role_arn: str,
+        role_name_prefix: str,
+    ) -> None:
+        """
+        Test that terraform plan accepts a null role_name_prefix and one at the length cap.
+
+        :param Path test_module_dir: Temporary test module directory
+        :param Path fixtures_dir: Path to Lambda fixtures
+        :param str aws_provider_version: AWS provider version to test
+        :param str aws_region: AWS region to plan against
+        :param str test_role_arn: IAM role ARN for testing
+        :param str role_name_prefix: Value under test
+        """
+        create_terraform_config(
+            test_module_dir,
+            fixtures_dir / "simple_lambda",
+            "test-role-prefix-plan",
+            "devnull@infrahouse.com",
+            aws_provider_version,
+            aws_region=aws_region,
+            role_arn=test_role_arn,
+            role_name_prefix=role_name_prefix,
+        )
+
+        plan = terraform_plan(test_module_dir)
+
+        assert plan.returncode == 0, plan.stdout + plan.stderr
+        assert not variable_validation_errors(plan.stdout, "role_name_prefix")
+
+    @pytest.mark.parametrize(
+        "role_name_prefix",
+        [
+            "",
+            ROLE_NAME_PREFIX_MAX + "x",  # 39 characters
+            "actions-runner-*",  # "*" is outside the IAM role-name set
+        ],
+        ids=["empty", "39-chars", "wildcard"],
+    )
+    def test_role_name_prefix_validation_rejects(
+        self,
+        test_module_dir: Path,
+        fixtures_dir: Path,
+        aws_provider_version: str,
+        aws_region: str,
+        test_role_arn: str,
+        role_name_prefix: str,
+    ) -> None:
+        """
+        Test that terraform plan fails on the module's role_name_prefix validation rule.
+
+        :param Path test_module_dir: Temporary test module directory
+        :param Path fixtures_dir: Path to Lambda fixtures
+        :param str aws_provider_version: AWS provider version to test
+        :param str aws_region: AWS region to plan against
+        :param str test_role_arn: IAM role ARN for testing
+        :param str role_name_prefix: Value under test
+        """
+        create_terraform_config(
+            test_module_dir,
+            fixtures_dir / "simple_lambda",
+            "test-role-prefix-plan",
+            "devnull@infrahouse.com",
+            aws_provider_version,
+            aws_region=aws_region,
+            role_arn=test_role_arn,
+            role_name_prefix=role_name_prefix,
+        )
+
+        plan = terraform_plan(test_module_dir)
+
+        assert plan.returncode != 0, plan.stdout
+        assert variable_validation_errors(plan.stdout, "role_name_prefix"), plan.stdout
 
 
 class TestLambdaWithDependencies:
