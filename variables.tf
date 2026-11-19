@@ -125,6 +125,29 @@ variable "additional_iam_policy_arns" {
   default     = []
 }
 
+variable "role_name_prefix" {
+  description = <<-EOT
+    Prefix for the name of the Lambda execution role, used verbatim as the role's name_prefix.
+    Terraform appends a 26-character unique suffix and the module adds nothing, so end the prefix
+    with a separator such as "-" if you want one. 1 to 38 characters from the IAM role name set:
+    letters, digits and +=,.@_-. Set it when a policy has to match the role by name, for example
+    ArnLike on aws:PrincipalArn. If null (default), the prefix is the first 37 characters of
+    function_name plus "-". Changing it on an existing deployment replaces the role.
+  EOT
+  type        = string
+  default     = null
+
+  validation {
+    # Terraform 1.0 evaluates both sides of ||, so null is handled by a conditional instead,
+    # and can() keeps regex() from raising on null however the expression is evaluated.
+    condition     = var.role_name_prefix == null ? true : can(regex("^[\\w+=,.@-]{1,38}$", var.role_name_prefix))
+    error_message = <<-EOT
+      The role_name_prefix must be null, or 1 to 38 characters from the IAM role name set:
+      letters, digits and the characters +=,.@_- (for example "actions-runner-lambda-").
+    EOT
+  }
+}
+
 # Monitoring and Alerting Variables
 
 variable "alarm_emails" {
