@@ -48,6 +48,7 @@ def create_terraform_config(
     memory_utilization_threshold_percent: int = None,
     timeout: int = None,
     error_rate_period: int = None,
+    role_name_prefix: str = None,
 ):
     """
     Create Terraform configuration files for testing the module.
@@ -71,6 +72,8 @@ def create_terraform_config(
         when set, enables Lambda Insights and the memory alarm)
     :param int timeout: Lambda function timeout in seconds (optional; module default when unset)
     :param int error_rate_period: Error-rate alarm period in seconds (optional; module default when unset)
+    :param str role_name_prefix: IAM role name prefix passed to the module verbatim (optional; when None
+        the argument is omitted, so the module sees its default of null)
     """
     LOG.info("Creating Terraform root module in %s", module_dir)
 
@@ -207,6 +210,11 @@ def create_terraform_config(
     if error_rate_period is not None:
         error_rate_period_config = f"error_rate_period = {error_rate_period}"
 
+    role_name_prefix_config = ""
+    if role_name_prefix is not None:
+        # json.dumps yields a quoted, escaped string that is also a valid HCL string literal.
+        role_name_prefix_config = f"role_name_prefix = {json.dumps(role_name_prefix)}"
+
     main_tf = dedent(f"""
         {sg_resource}
         module "lambda_monitored" {{
@@ -218,6 +226,7 @@ def create_terraform_config(
           architecture      = "{architecture}"
           alert_strategy    = "{alert_strategy}"
           {timeout_config}
+          {role_name_prefix_config}
 
           alarm_emails = ["{alarm_email}"]
 
@@ -247,6 +256,10 @@ def create_terraform_config(
 
         output "lambda_role_arn" {
           value = module.lambda_monitored.lambda_role_arn
+        }
+
+        output "lambda_role_name" {
+          value = module.lambda_monitored.lambda_role_name
         }
 
         output "cloudwatch_log_group_name" {
