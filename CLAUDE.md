@@ -42,6 +42,12 @@ Defaults: `TEST_REGION=us-west-2`, `TEST_ROLE=arn:aws:iam::303467602807:role/lam
 preserves provisioned AWS resources after the test run (useful for alarm/SNS debugging). Test output is tee'd to
 `pytest-<timestamp>-output.log`.
 
+The targets exit with pytest's status, not tee's (issue #40): the Makefile sets `SHELL := /bin/bash` and `run_pytest`
+starts with `set -o pipefail` (not `.SHELLFLAGS`, which macOS's GNU make 3.81 ignores). `make test` stops at the first
+failing suite. A `TEST_SELECTOR` that matches nothing in a suite fails it too (pytest exit 5, no special case), so
+`make test TEST_SELECTOR=...` fails at the first suite the selector doesn't match: run narrow selections through the
+suite target, e.g. `make test-simple TEST_SELECTOR=...`.
+
 **Tests are real integration tests** — they assume STS `AssumeRole` on the test role and will apply/destroy real AWS
 infrastructure in the target account.
 

@@ -419,6 +419,9 @@ make test-x86             # Test x86_64 architecture only
 make test-arm             # Test arm64 architecture only
 ```
 
+Every test target fails when pytest fails: the output is still tee'd to `pytest-<timestamp>-output.log`, and the
+target exits with pytest's status, not tee's. `make test` stops at the first suite that fails and skips the rest.
+
 ### Filtering Tests
 
 You can filter tests using the `TEST_SELECTOR` variable:
@@ -436,6 +439,11 @@ make test-deps TEST_SELECTOR="py3.13"
 # Combine filters (AND logic)
 make test-simple TEST_SELECTOR="provider-6.x and py3.12"
 ```
+
+A selector that matches none of a suite's tests fails that suite: pytest exits with 5, "no tests collected", and the
+target fails with it. `make test` passes the same `TEST_SELECTOR` to every suite, so it fails at the first suite the
+selector matches nothing in. Run a narrow selection through the suite's own target, e.g.
+`make test-simple TEST_SELECTOR="test_lambda_deployment"`, not `make test TEST_SELECTOR="test_lambda_deployment"`.
 
 ### Customizing Test Configuration
 
