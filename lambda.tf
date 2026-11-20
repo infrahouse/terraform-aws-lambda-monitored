@@ -31,11 +31,13 @@ resource "aws_lambda_function" "this" {
     }
   }
 
+  # time_sleep.log_group_destroy_delay makes destroy wait between this function and its log group.
   depends_on = [
     aws_iam_role_policy.lambda_logging,
     aws_iam_role_policy.lambda_vpc_access,
     aws_iam_role_policy_attachment.lambda_insights,
-    aws_cloudwatch_log_group.lambda
+    aws_cloudwatch_log_group.lambda,
+    time_sleep.log_group_destroy_delay
   ]
 
   tags = merge(

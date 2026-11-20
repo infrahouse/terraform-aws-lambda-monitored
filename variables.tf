@@ -113,6 +113,30 @@ variable "cloudwatch_log_retention_days" {
   }
 }
 
+variable "log_group_destroy_delay_seconds" {
+  description = <<-EOT
+    Seconds that terraform destroy waits between deleting the Lambda function and deleting its
+    CloudWatch log group. Lambda can still write the function's last log lines a few seconds after
+    the function is deleted; the wait lets them land before the group goes, so they can't leave
+    an orphan log group behind (issue #26). Apply never waits. 0 turns the wait off.
+  EOT
+  type        = number
+  default     = 10
+
+  validation {
+    # A null fails both comparisons with an unhelpful error, so it is rejected by the conditional instead.
+    condition = (
+      var.log_group_destroy_delay_seconds == null
+      ? false
+      : (
+        var.log_group_destroy_delay_seconds >= 0
+        && floor(var.log_group_destroy_delay_seconds) == var.log_group_destroy_delay_seconds
+      )
+    )
+    error_message = "The log_group_destroy_delay_seconds must be a whole number of seconds, 0 or more."
+  }
+}
+
 variable "description" {
   description = "Description of the Lambda function"
   type        = string
