@@ -24,8 +24,8 @@ the full monitoring stack so you can pass a compliance audit without follow-up w
   into the deployment artifact.
 - **Smart change detection.** Only source files plus `requirements.txt` hash into the deployment — recreating
   `.terraform` doesn't trigger spurious re-uploads.
-- **Tight IAM by default.** Logging policy is scoped to the function's log group; VPC access (when enabled)
-  grants ENI permissions only to the subnets you specified.
+- **Tight IAM by default.** Logging policy is scoped to the function's log group and can't create log groups;
+  VPC access (when enabled) grants ENI permissions only to the subnets you specified.
 
 ## Features
 

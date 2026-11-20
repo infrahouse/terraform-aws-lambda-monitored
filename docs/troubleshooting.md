@@ -86,6 +86,44 @@ Confirm with:
 aws sns get-topic-attributes --topic-arn <external-arn> --query 'Attributes.Policy'
 ```
 
+## Log group
+
+### `ResourceAlreadyExistsException` creating `/aws/lambda/<function_name>`
+
+The log group already exists outside Terraform's state. The usual cause is an orphan from an earlier destroy: Lambda
+wrote the function's last log lines a few seconds after the function was deleted, found the group gone, and the
+execution role re-created it. Such a group has no retention (`retentionInDays` unset) and usually `storedBytes: 0`, and
+CloudTrail shows its `CreateLogGroup` made by the function's execution role with user agent `awslambda-worker/1.0`.
+See [Architecture → Log group lifecycle](architecture.md#log-group-lifecycle) and
+[#26](https://github.com/infrahouse/terraform-aws-lambda-monitored/issues/26).
+
+The module now prevents this: the role can't create log groups, and destroy waits `log_group_destroy_delay_seconds`
+before deleting the group. An orphan can still be left by a destroy that ran an older module version, or when a policy
+in `additional_iam_policy_arns` grants `logs:CreateLogGroup` again (`AWSLambdaBasicExecutionRole` does, on `*`); then
+only the wait protects the group.
+
+Check the group, then either delete it if it holds nothing you need, or import it so Terraform manages it again:
+
+```bash
+aws logs describe-log-groups --log-group-name-prefix /aws/lambda/<function_name>
+aws logs delete-log-group --log-group-name /aws/lambda/<function_name>
+# or
+terraform import 'module.<name>.aws_cloudwatch_log_group.lambda' /aws/lambda/<function_name>
+```
+
+After an import, the next apply sets the module's retention and tags on the group.
+
+### `terraform destroy` pauses before deleting the log group
+
+Expected. Destroy waits `log_group_destroy_delay_seconds` (10 by default) between deleting the function and deleting
+its log group, so Lambda's last log lines can't re-create the group. Set it to `0` to turn the wait off.
+
+### `terraform init` can't find `hashicorp/time`
+
+The module uses `time_sleep` from the `hashicorp/time` provider (`~> 0.9`) for the destroy-time wait. If your
+`terraform init` installs providers from a mirror (`provider_installation` in the CLI configuration, or
+`-plugin-dir`), add `hashicorp/time` to it.
+
 ## IAM
 
 ### `The role defined for the function cannot be assumed by Lambda`

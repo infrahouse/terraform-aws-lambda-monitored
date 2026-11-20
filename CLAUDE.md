@@ -21,9 +21,10 @@ All day-to-day tasks go through the Makefile (`make help` lists targets):
 - `make bootstrap` — install Python deps from `tests/requirements.txt` (pip/setuptools pinned)
 - `make lint` — `yamllint .github/workflows` + `terraform fmt -check -recursive`
 - `make format` — `terraform fmt -recursive` + `black tests/`
-- `make test` — runs the full integration suite (`test-simple`, `test-deps`, `test-monitoring`, `test-sns`, `test-vpc`)
+- `make test` — runs the full integration suite (`test-simple`, `test-deps`, `test-monitoring`, `test-memory`,
+  `test-sns`, `test-vpc`, `test-log-group`)
 - `make test-<suite>` — run one suite (e.g. `make test-simple`); suites map to `Test*` classes in `tests/test_module.py`
-  (`TestErrorMonitoring` lives in `tests/test_error_monitoring.py`)
+  (`TestErrorMonitoring` lives in `tests/test_error_monitoring.py`, `TestLogGroup` in `tests/test_log_group.py`)
 - `make release-{patch,minor,major}` — bumps version via `.bumpversion.cfg`, edits `CHANGELOG.md`, commits, tags;
   requires being on `main`
 
@@ -57,7 +58,9 @@ The root module is flat (not split into submodules). Files are grouped by concer
 - `lambda_s3.tf` — uses `registry.infrahouse.com/infrahouse/s3-bucket/aws` submodule for the deployment bucket;
   filename embeds `package_hash`.
 - `lambda_iam.tf` — execution role (assume-role policy, logging policy, VPC ENI policy when `lambda_subnet_ids` is
-  set, user-supplied `additional_iam_policy_arns`). **IAM role uses `name_prefix`** (`local.role_name_prefix`):
+  set, user-supplied `additional_iam_policy_arns`). **The logging policy grants only `CreateLogStream` and
+  `PutLogEvents`, never `logs:CreateLogGroup`**: the module creates the group, and with that permission a log write
+  after destroy re-created it outside Terraform (issue #26). **IAM role uses `name_prefix`** (`local.role_name_prefix`):
   `var.role_name_prefix` verbatim when set (validated as 1–38 chars of `[\w+=,.@-]`, null-safe without `||` or
   `length()` because Terraform 1.0 doesn't short-circuit `||`); otherwise `function_name` truncated to 37 chars plus
   `-` to stay under AWS's 38-char limit, full name preserved in tags. Keep that null branch byte-for-byte:
@@ -69,9 +72,12 @@ The root module is flat (not split into submodules). Files are grouped by concer
   **`errors_immediate` evaluates `ceil(var.timeout / 60) + 5` periods with `datapoints_to_alarm = 1`**: Lambda
   stamps `Errors` at invocation start but publishes it at invocation end, so a shorter window misses late errors
   (issue #33).
-- `sns.tf` / `cloudwatch.tf` — SNS topic + email subscriptions; log group with retention. Alarms fan out to
-  `local.all_alarm_topic_arns` which merges the created topic with user-supplied `alarm_topic_arns` for
-  PagerDuty/Slack integrations.
+- `sns.tf` / `cloudwatch.tf` — SNS topic + email subscriptions; log group with retention, plus
+  `time_sleep.log_group_destroy_delay` (`hashicorp/time`, `destroy_duration` only). It depends on the log group and
+  the logging policy, and the function depends on it, so destroy runs function → wait
+  (`log_group_destroy_delay_seconds`, default 10) → log group and logging policy, and apply never waits (issue #26).
+  Alarms fan out to `local.all_alarm_topic_arns` which merges the created topic with user-supplied
+  `alarm_topic_arns` for PagerDuty/Slack integrations.
 - `locals.tf` — owns `module_version` (must be bumped manually via bumpversion; also referenced in `lambda_code.tf`
   so module upgrades trigger a repackage), requirements-file auto-detection, and `source_files_hash`.
 - `variables.tf` / `outputs.tf` / `terraform.tf` — inputs, outputs, provider constraints.
