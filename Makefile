@@ -38,7 +38,7 @@ install-hooks:  ## Install repo hooks
 	@chmod +x .git/hooks/pre-commit
 
 .PHONY: test
-test: test-simple test-deps test-monitoring test-memory test-sns test-vpc ## Run all tests (use TEST_SELECTOR to filter, KEEP_AFTER=1 to preserve resources)
+test: test-simple test-deps test-monitoring test-memory test-sns test-vpc test-log-group ## Run all tests (use TEST_SELECTOR to filter, KEEP_AFTER=1 to preserve resources)
 	@echo "All tests are done"
 
 .PHONY: test-simple
@@ -72,6 +72,10 @@ test-sns:  ## Run SNS integration tests (use TEST_SELECTOR to filter)
 .PHONY: test-vpc
 test-vpc:  ## Run VPC integration tests (use TEST_SELECTOR to filter)
 	$(call run_pytest,TestVPCIntegration,tests/test_module.py)
+
+.PHONY: test-log-group
+test-log-group:  ## Run log group lifecycle tests, issue #26 (use TEST_SELECTOR to filter)
+	$(call run_pytest,TestLogGroup,tests/test_log_group.py)
 
 .PHONY: test-x86
 test-x86:  ## Run tests for x86_64 architecture only (use TEST_SELECTOR to filter)
