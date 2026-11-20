@@ -34,7 +34,7 @@ the full monitoring stack so you can pass a compliance audit without follow-up w
 - **Smart change detection.** The packager hashes your source files plus `requirements.txt` — not the entire
   `.build/` directory — so re-creating `.terraform` doesn't trigger spurious re-uploads.
 - **Tight IAM by default.** Execution role uses `name_prefix`, logging policy is scoped to the function's log
-  group and can't create log groups, and VPC access (when enabled) grants ENI permissions only to the subnets you
+  group and denies re-creating it, and VPC access (when enabled) grants ENI permissions only to the subnets you
   specified.
 - **Real integration tests.** The test suite applies and destroys real AWS infrastructure across the full
   matrix of supported AWS providers, architectures, and Python versions — no mocks.
@@ -357,9 +357,12 @@ role names can't be changed in place.
 ### Log Group on Destroy
 
 The module creates the log group `/aws/lambda/<function_name>` itself, before the function. The execution role may
-create log streams in that group and write events to it, but it can't create log groups. On `terraform destroy`,
-Terraform deletes the function, waits `log_group_destroy_delay_seconds` (10 by default), then deletes the log group
-and the role's logging policy.
+create log streams in that group and write events to it, and its logging policy explicitly denies
+`logs:CreateLogGroup` on the group. An explicit deny wins over any Allow elsewhere on the role, such as the one on `*`
+in `CloudWatchLambdaInsightsExecutionRolePolicy` (attached when the memory alarm is on) or in
+`AWSLambdaBasicExecutionRole` passed through `additional_iam_policy_arns`. On `terraform destroy`, Terraform deletes
+the function, waits `log_group_destroy_delay_seconds` (10 by default), then deletes the log group and the role's
+logging policy.
 
 Both guard against the same race ([#26](https://github.com/infrahouse/terraform-aws-lambda-monitored/issues/26)):
 Lambda can write a function's last log lines a few seconds after the function is deleted. If the group is already
@@ -370,9 +373,8 @@ The wait is a `time_sleep` resource, so the module also needs the `hashicorp/tim
 installs it. Apply never waits, and the wait still happens when you remove the module block instead of running
 `terraform destroy`. Set `log_group_destroy_delay_seconds = 0` to turn it off.
 
-Don't attach a policy that grants `logs:CreateLogGroup` through `additional_iam_policy_arns`
-(`AWSLambdaBasicExecutionRole` does, on `*`). The function doesn't need it, and it would leave only the wait between
-a late log line and an orphan group.
+The deny covers only this group's name. A policy in `additional_iam_policy_arns` that allows `logs:CreateLogGroup`
+still works for other log groups.
 
 Upgrading an existing deployment updates the inline logging policy in place and adds
 `time_sleep.log_group_destroy_delay`. Nothing is replaced.

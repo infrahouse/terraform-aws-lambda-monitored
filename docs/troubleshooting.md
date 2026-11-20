@@ -97,10 +97,10 @@ CloudTrail shows its `CreateLogGroup` made by the function's execution role with
 See [Architecture → Log group lifecycle](architecture.md#log-group-lifecycle) and
 [#26](https://github.com/infrahouse/terraform-aws-lambda-monitored/issues/26).
 
-The module now prevents this: the role can't create log groups, and destroy waits `log_group_destroy_delay_seconds`
-before deleting the group. An orphan can still be left by a destroy that ran an older module version, or when a policy
-in `additional_iam_policy_arns` grants `logs:CreateLogGroup` again (`AWSLambdaBasicExecutionRole` does, on `*`); then
-only the wait protects the group.
+The module now prevents this: the role's logging policy denies `logs:CreateLogGroup` on the group, which overrides
+an Allow from any other policy on the role (Lambda Insights' managed policy, `additional_iam_policy_arns`), and destroy
+waits `log_group_destroy_delay_seconds` before deleting the group. An orphan can still be left by a destroy that ran
+an older module version.
 
 Check the group, then either delete it if it holds nothing you need, or import it so Terraform manages it again:
 

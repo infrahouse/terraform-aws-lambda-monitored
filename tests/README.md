@@ -34,7 +34,7 @@ tests/
 │   └── lambda_logs_continuously/ # Lambda that logs every half second, for the destroy test
 ├── test_module.py         # Main test suite
 ├── test_error_monitoring.py # Error alarm tests (immediate/threshold, late and sparse errors)
-├── test_log_group.py      # Log group tests: no CreateLogGroup on the role, group stays deleted after destroy
+├── test_log_group.py      # Log group tests: role denied CreateLogGroup, group stays deleted after destroy
 ├── tools/                  # Diagnostics, not collected by pytest
 │   ├── probe_alarm_range.py # Measures how far back CloudWatch alarms look for datapoints
 │   └── probe_single_datapoint.py # Checks datapoints_to_alarm against breaching/missing periods
@@ -191,17 +191,21 @@ variable's validation rule.
 
 Lives in `test_log_group.py`; `make test-log-group` runs it (issue #26).
 
-**test_logging_policy_without_create_log_group**: Applies the module and reads the role's inline logging policy from
-IAM. No `Allow` statement may grant `logs:CreateLogGroup`, wildcards included, while `logs:CreateLogStream` and
-`logs:PutLogEvents` stay. Then invokes the function and waits for a log event in the module's log group, so logging
-still works without the permission.
+**test_logging_policy_without_create_log_group** (`default`, `memory-alarm`): Applies the module and reads the role's
+inline logging policy from IAM. No `Allow` statement may grant `logs:CreateLogGroup`, wildcards included, a `Deny`
+statement must cover it, and `logs:CreateLogStream` and `logs:PutLogEvents` stay. Then asks the IAM policy simulator,
+which evaluates every policy on the role: `logs:CreateLogGroup` on the group's ARN and on `ARN:*` must be
+`explicitDeny`, creating a stream and writing events `allowed`. The `memory-alarm` case turns on Lambda Insights,
+whose managed policy allows `logs:CreateLogGroup` on `*`. Finally invokes the function and waits for a log event in
+the module's log group, so logging still works.
 
 **test_log_group_stays_deleted_after_destroy**: Deploys `lambda_logs_continuously`, starts a 90-second async
 invocation, waits for its first line, and destroys while it runs. Deleting the function stops the invocation, and
 Lambda flushes the lines it still holds right after, which on the unfixed module re-created the group every time.
 Then checks every 5 seconds for 60 seconds that `/aws/lambda/<function_name>` hasn't come back. A group that reappears
 is deleted, so the next run's apply isn't blocked, and the test fails with its creation time and retention. It
-destroys even with `--keep-after`.
+destroys even with `--keep-after`. The `memory-alarm-no-wait` case turns on Lambda Insights and sets
+`log_group_destroy_delay_seconds = 0`, so only the deny keeps the group from coming back.
 
 **test_log_group_destroy_delay_validation_accepts** / **test_log_group_destroy_delay_validation_rejects**: Run
 `terraform plan` only, creating nothing. `0` and `10` pass; `-1` and `1.5` fail on the variable's validation rule.
