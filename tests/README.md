@@ -35,6 +35,7 @@ tests/
 ├── test_module.py         # Main test suite
 ├── test_error_monitoring.py # Error alarm tests (immediate/threshold, late and sparse errors)
 ├── test_log_group.py      # Log group tests: role denied CreateLogGroup, group stays deleted after destroy
+├── test_terraform_floor.py # The oldest Terraform required_version allows validates the module (no AWS)
 ├── tools/                  # Diagnostics, not collected by pytest
 │   ├── probe_alarm_range.py # Measures how far back CloudWatch alarms look for datapoints
 │   └── probe_single_datapoint.py # Checks datapoints_to_alarm against breaching/missing periods
@@ -209,6 +210,20 @@ destroys even with `--keep-after`. The `memory-alarm-no-wait` case turns on Lamb
 
 **test_log_group_destroy_delay_validation_accepts** / **test_log_group_destroy_delay_validation_rejects**: Run
 `terraform plan` only, creating nothing. `0` and `10` pass; `-1` and `1.5` fail on the variable's validation rule.
+
+### TestTerraformFloor
+
+Lives in `test_terraform_floor.py`; `make test-terraform-floor` runs it, and CI runs that before the integration
+tests (issue #36). It needs no AWS access.
+
+**test_module_validates_at_floor**: Reads the floor, the `>=` bound of `required_version` in `terraform.tf`, pads it
+to a full version (`1.9` → `1.9.0`), downloads that Terraform release from releases.hashicorp.com and checks it
+against the release's `SHA256SUMS`. Then copies the module's files (tracked and untracked, not git-ignored) to a
+temporary directory and runs `terraform init -backend=false` and `terraform validate` there. Init also checks the
+`required_version` of every submodule, so a dependency that needs a newer Terraform fails the test too.
+
+**test_floor_parses** / **test_floor_rejects**: The floor is the `>=` bound wherever it sits in the constraint; a
+`required_version` without one, such as `~> 1.9`, fails instead of guessing a version.
 
 ## Environment Variables
 

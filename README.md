@@ -417,6 +417,9 @@ make test-sns             # Test SNS integration
 # Run architecture-specific tests
 make test-x86             # Test x86_64 architecture only
 make test-arm             # Test arm64 architecture only
+
+# Validate the module with the oldest Terraform that required_version allows (needs no AWS)
+make test-terraform-floor
 ```
 
 Every test target fails when pytest fails: the output is still tee'd to `pytest-<timestamp>-output.log`, and the
