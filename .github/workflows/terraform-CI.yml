@@ -59,6 +59,11 @@ jobs:
       - name: Code Style Check
         run: make lint
 
+      # Validate the module with the oldest Terraform that required_version allows (issue #36).
+      # It needs no AWS and takes about a minute, so a broken floor fails before the integration tests start.
+      - name: Terraform Version Floor
+        run: make test-terraform-floor
+
       # Generates an execution plan for Terraform
       - name: Terraform Tests
         run: make test
