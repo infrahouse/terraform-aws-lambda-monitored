@@ -4,7 +4,8 @@ Log group lifecycle tests for terraform-aws-lambda-monitored (issue #26).
 After ``terraform destroy``, ``/aws/lambda/<function_name>`` could reappear seconds later,
 created outside Terraform without a retention policy, and the next apply then failed with
 ``ResourceAlreadyExistsException``. These tests check the two parts of the fix: the execution
-role can't create log groups, and the group stays deleted after destroy.
+role can't create log groups, and the group stays deleted after destroy. The destroy-time
+wait between the function and its log group is an input, whose validation is checked at plan.
 """
 
 import json
@@ -14,11 +15,13 @@ from fnmatch import fnmatchcase
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+import pytest
 from botocore.client import BaseClient
 from infrahouse_core.timeout import timeout
 from pytest_infrahouse import terraform_apply
 
 from tests.conftest import LOG, create_terraform_config
+from tests.test_module import terraform_plan, variable_validation_errors
 
 # After terraform destroy, how long to watch for the function's log group to come back.
 # In the issue the orphan appeared 7 seconds after the function was deleted.
@@ -110,6 +113,7 @@ def write_simple_lambda_config(
     aws_provider_version: str,
     aws_region: str,
     test_role_arn: str,
+    log_group_destroy_delay_seconds: float = None,
 ) -> None:
     """
     Write a root module that deploys the ``simple_lambda`` fixture with the module's defaults.
@@ -120,6 +124,8 @@ def write_simple_lambda_config(
     :param str aws_provider_version: AWS provider version constraint
     :param str aws_region: AWS region to deploy to
     :param str test_role_arn: IAM role ARN Terraform assumes
+    :param float log_group_destroy_delay_seconds: Value for the module input of that name
+        (optional; when None the argument is omitted and the module uses its default)
     """
     create_terraform_config(
         test_module_dir,
@@ -129,6 +135,7 @@ def write_simple_lambda_config(
         aws_provider_version,
         aws_region=aws_region,
         role_arn=test_role_arn,
+        log_group_destroy_delay_seconds=log_group_destroy_delay_seconds,
     )
 
 
@@ -288,3 +295,77 @@ class TestLogGroup:
             f"retentionInDays={reappeared.get('retentionInDays')}, "
             f"storedBytes={reappeared.get('storedBytes')}"
         )
+
+    @pytest.mark.parametrize("delay", [0, 10], ids=["zero", "ten"])
+    def test_log_group_destroy_delay_validation_accepts(
+        self,
+        test_module_dir: Path,
+        fixtures_dir: Path,
+        aws_provider_version: str,
+        aws_region: str,
+        test_role_arn: str,
+        delay: float,
+    ) -> None:
+        """
+        Test that terraform plan accepts 0, which turns the wait off, and the default of 10 seconds.
+
+        :param Path test_module_dir: Temporary test module directory
+        :param Path fixtures_dir: Path to Lambda fixtures
+        :param str aws_provider_version: AWS provider version to test
+        :param str aws_region: AWS region to plan against
+        :param str test_role_arn: IAM role ARN for testing
+        :param float delay: Value under test
+        """
+        write_simple_lambda_config(
+            test_module_dir,
+            fixtures_dir,
+            "test-log-group-delay-plan",
+            aws_provider_version,
+            aws_region,
+            test_role_arn,
+            log_group_destroy_delay_seconds=delay,
+        )
+
+        plan = terraform_plan(test_module_dir)
+
+        assert plan.returncode == 0, plan.stdout + plan.stderr
+        assert not variable_validation_errors(
+            plan.stdout, "log_group_destroy_delay_seconds"
+        )
+
+    @pytest.mark.parametrize("delay", [-1, 1.5], ids=["negative", "fraction"])
+    def test_log_group_destroy_delay_validation_rejects(
+        self,
+        test_module_dir: Path,
+        fixtures_dir: Path,
+        aws_provider_version: str,
+        aws_region: str,
+        test_role_arn: str,
+        delay: float,
+    ) -> None:
+        """
+        Test that terraform plan fails on the module's rule for log_group_destroy_delay_seconds.
+
+        :param Path test_module_dir: Temporary test module directory
+        :param Path fixtures_dir: Path to Lambda fixtures
+        :param str aws_provider_version: AWS provider version to test
+        :param str aws_region: AWS region to plan against
+        :param str test_role_arn: IAM role ARN for testing
+        :param float delay: Value under test
+        """
+        write_simple_lambda_config(
+            test_module_dir,
+            fixtures_dir,
+            "test-log-group-delay-plan",
+            aws_provider_version,
+            aws_region,
+            test_role_arn,
+            log_group_destroy_delay_seconds=delay,
+        )
+
+        plan = terraform_plan(test_module_dir)
+
+        assert plan.returncode != 0, plan.stdout
+        assert variable_validation_errors(
+            plan.stdout, "log_group_destroy_delay_seconds"
+        ), plan.stdout
