@@ -4,8 +4,9 @@ Log group lifecycle tests for terraform-aws-lambda-monitored (issue #26).
 After ``terraform destroy``, ``/aws/lambda/<function_name>`` could reappear seconds later,
 created outside Terraform without a retention policy, and the next apply then failed with
 ``ResourceAlreadyExistsException``. These tests check the two parts of the fix: the execution
-role can't create log groups, and the group stays deleted after destroy. The destroy-time
-wait between the function and its log group is an input, whose validation is checked at plan.
+role can't create its log group, whatever other policies it has, and the group stays deleted
+after destroy. The destroy-time wait between the function and its log group is an input, whose
+validation is checked at plan.
 """
 
 import json
@@ -13,7 +14,7 @@ import time
 from datetime import datetime, timezone
 from fnmatch import fnmatchcase
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import pytest
 from botocore.client import BaseClient
@@ -37,13 +38,23 @@ LOG_EVENTS_TIMEOUT_SECONDS = 180
 LONG_INVOCATION_SECONDS = 90
 LONG_INVOCATION_TIMEOUT = 120
 
+# How long to retry the IAM policy simulation while a role's new policies propagate.
+IAM_SETTLE_SECONDS = 120
 
-def allowed_actions(policy_document: Dict[str, Any]) -> List[str]:
+# Module inputs that change what the execution role may do. With the memory alarm on, the module
+# attaches CloudWatchLambdaInsightsExecutionRolePolicy, which allows logs:CreateLogGroup on "*".
+MEMORY_ALARM_INPUTS = {"memory_utilization_threshold_percent": 80}
+
+
+def allowed_actions(
+    policy_document: Dict[str, Any], effect: str = "Allow"
+) -> List[str]:
     """
-    List the actions that the ``Allow`` statements of an IAM policy document grant.
+    List the actions of an IAM policy document's statements with the given effect.
 
     :param dict policy_document: Policy document as boto3 returns it, already URL-decoded
-    :return: Every action of every ``Allow`` statement, as written in the policy
+    :param str effect: ``Allow`` or ``Deny``
+    :return: Every action of every statement with that effect, as written in the policy
     :rtype: list
     """
     statements = policy_document["Statement"]
@@ -52,7 +63,7 @@ def allowed_actions(policy_document: Dict[str, Any]) -> List[str]:
 
     actions = []
     for statement in statements:
-        if statement["Effect"] != "Allow":
+        if statement["Effect"] != effect:
             continue
         statement_actions = statement.get("Action", [])
         if isinstance(statement_actions, str):
@@ -136,6 +147,41 @@ def wait_for_log_event(
             time.sleep(5)
 
 
+def simulate_role(
+    iam_client: BaseClient,
+    role_arn: str,
+    expected: Dict[Tuple[str, str], str],
+) -> Dict[Tuple[str, str], str]:
+    """
+    Ask IAM what the role may do, retrying until the answers match or IAM_SETTLE_SECONDS pass.
+
+    ``simulate_principal_policy`` evaluates every policy on the role, inline and attached, so it
+    gives the role's effective permission rather than what one policy document says. A new role's
+    policies can take a while to show up in it, hence the retries.
+
+    :param BaseClient iam_client: Boto3 IAM client
+    :param str role_arn: ARN of the role to simulate
+    :param dict expected: ``(action, resource ARN)`` to the expected ``EvalDecision``
+        (``allowed``, ``explicitDeny`` or ``implicitDeny``)
+    :return: ``(action, resource ARN)`` to the decision IAM gave on the last try
+    :rtype: dict
+    """
+    deadline = time.monotonic() + IAM_SETTLE_SECONDS
+    while True:
+        decisions = {}
+        for action, resource in expected:
+            response = iam_client.simulate_principal_policy(
+                PolicySourceArn=role_arn, ActionNames=[action], ResourceArns=[resource]
+            )
+            decisions[(action, resource)] = response["EvaluationResults"][0][
+                "EvalDecision"
+            ]
+        if decisions == expected or time.monotonic() >= deadline:
+            return decisions
+        LOG.info("IAM simulation not settled yet: %s", decisions)
+        time.sleep(10)
+
+
 def write_lambda_config(
     test_module_dir: Path,
     fixtures_dir: Path,
@@ -146,6 +192,7 @@ def write_lambda_config(
     fixture: str = "simple_lambda",
     function_timeout: int = None,
     log_group_destroy_delay_seconds: float = None,
+    memory_utilization_threshold_percent: int = None,
 ) -> None:
     """
     Write a root module that deploys a fixture with the module's defaults.
@@ -160,6 +207,8 @@ def write_lambda_config(
     :param int function_timeout: Function timeout in seconds (optional; module default when None)
     :param float log_group_destroy_delay_seconds: Value for the module input of that name
         (optional; when None the argument is omitted and the module uses its default)
+    :param int memory_utilization_threshold_percent: Value for the module input of that name
+        (optional; when None the memory alarm and Lambda Insights stay off)
     """
     create_terraform_config(
         test_module_dir,
@@ -171,12 +220,18 @@ def write_lambda_config(
         role_arn=test_role_arn,
         timeout=function_timeout,
         log_group_destroy_delay_seconds=log_group_destroy_delay_seconds,
+        memory_utilization_threshold_percent=memory_utilization_threshold_percent,
     )
 
 
 class TestLogGroup:
     """The function's log group: who may create it, and that it stays deleted after destroy."""
 
+    @pytest.mark.parametrize(
+        "name_suffix, module_inputs",
+        [("", {}), ("-insights", MEMORY_ALARM_INPUTS)],
+        ids=["default", "memory-alarm"],
+    )
     def test_logging_policy_without_create_log_group(
         self,
         test_module_dir: Path,
@@ -188,14 +243,22 @@ class TestLogGroup:
         logs_client: BaseClient,
         keep_after: bool,
         test_role_arn: str,
+        name_suffix: str,
+        module_inputs: Dict[str, Any],
     ) -> None:
         """
-        Test that the execution role can't create log groups, yet still logs to the module's group.
+        Test that the execution role can't create its log group, yet still logs to it.
 
         The module creates ``/aws/lambda/<function_name>`` before the function, so the role never
         needs ``logs:CreateLogGroup``. Without it, a late write after ``terraform destroy`` can't
-        bring the group back. The invocation checks that logging still works: a log event must
-        reach the module's log group.
+        bring the group back.
+
+        The inline logging policy must not allow ``logs:CreateLogGroup`` and must deny it on the
+        module's group. Then the IAM policy simulator, which evaluates every policy on the role,
+        must answer ``explicitDeny`` for it, also with the memory alarm on: that attaches
+        ``CloudWatchLambdaInsightsExecutionRolePolicy``, which allows ``logs:CreateLogGroup`` on
+        ``*``. Creating streams and writing events must stay ``allowed``, and an invocation's log
+        event must reach the module's group.
 
         :param Path test_module_dir: Temporary test module directory
         :param Path fixtures_dir: Path to Lambda fixtures
@@ -206,8 +269,10 @@ class TestLogGroup:
         :param BaseClient logs_client: Boto3 CloudWatch Logs client fixture
         :param bool keep_after: Whether to keep resources after test
         :param str test_role_arn: IAM role ARN for testing
+        :param str name_suffix: Appended to the function name, so the cases don't share names
+        :param dict module_inputs: Extra module inputs for the case
         """
-        function_name = "test-logging-policy"
+        function_name = f"test-logging-policy{name_suffix}"
         write_lambda_config(
             test_module_dir,
             fixtures_dir,
@@ -215,6 +280,7 @@ class TestLogGroup:
             aws_provider_version,
             aws_region,
             test_role_arn,
+            **module_inputs,
         )
 
         with terraform_apply(
@@ -227,11 +293,32 @@ class TestLogGroup:
                 RoleName=role_name, PolicyName=f"{function_name}-logging"
             )
             actions = allowed_actions(policy["PolicyDocument"])
-            LOG.info("Inline logging policy of %s allows %s", role_name, actions)
+            denied = allowed_actions(policy["PolicyDocument"], effect="Deny")
+            LOG.info(
+                "Inline logging policy of %s allows %s, denies %s",
+                role_name,
+                actions,
+                denied,
+            )
 
             assert not grants_action(actions, "logs:CreateLogGroup"), actions
             assert grants_action(actions, "logs:CreateLogStream"), actions
             assert grants_action(actions, "logs:PutLogEvents"), actions
+            assert grants_action(denied, "logs:CreateLogGroup"), denied
+
+            group_arn = tf_output["cloudwatch_log_group_arn"]["value"]
+            stream_arn = f"{group_arn}:log-stream:simulated"
+            expected = {
+                ("logs:CreateLogGroup", group_arn): "explicitDeny",
+                ("logs:CreateLogGroup", f"{group_arn}:*"): "explicitDeny",
+                ("logs:CreateLogStream", stream_arn): "allowed",
+                ("logs:PutLogEvents", stream_arn): "allowed",
+            }
+            decisions = simulate_role(
+                iam_client, tf_output["lambda_role_arn"]["value"], expected
+            )
+            LOG.info("IAM simulation for %s: %s", role_name, decisions)
+            assert decisions == expected
 
             invoke_once(lambda_client, function_name)
 
@@ -239,6 +326,19 @@ class TestLogGroup:
             event = wait_for_log_event(logs_client, log_group_name)
             LOG.info("First log event in %s: %s", log_group_name, event["message"])
 
+    @pytest.mark.parametrize(
+        "name_suffix, module_inputs",
+        [
+            ("", {}),
+            # Lambda Insights' policy allows logs:CreateLogGroup on "*" and there is no wait,
+            # so only the logging policy's deny keeps the group from coming back.
+            (
+                "-insights",
+                {**MEMORY_ALARM_INPUTS, "log_group_destroy_delay_seconds": 0},
+            ),
+        ],
+        ids=["default", "memory-alarm-no-wait"],
+    )
     def test_log_group_stays_deleted_after_destroy(
         self,
         test_module_dir: Path,
@@ -248,6 +348,8 @@ class TestLogGroup:
         lambda_client: BaseClient,
         logs_client: BaseClient,
         test_role_arn: str,
+        name_suffix: str,
+        module_inputs: Dict[str, Any],
     ) -> None:
         """
         Test that ``/aws/lambda/<function_name>`` doesn't come back after ``terraform destroy``.
@@ -264,6 +366,10 @@ class TestLogGroup:
         recreate the group; the test must pass reliably with the fix in place. It destroys even
         with ``--keep-after``, because the destroy is what it tests.
 
+        The ``memory-alarm-no-wait`` case turns on Lambda Insights, whose managed policy allows
+        ``logs:CreateLogGroup`` on ``*``, and sets the wait to 0, so only the deny in the module's
+        logging policy stands between the late flush and a new group.
+
         :param Path test_module_dir: Temporary test module directory
         :param Path fixtures_dir: Path to Lambda fixtures
         :param str aws_provider_version: AWS provider version to test
@@ -271,8 +377,10 @@ class TestLogGroup:
         :param BaseClient lambda_client: Boto3 Lambda client fixture
         :param BaseClient logs_client: Boto3 CloudWatch Logs client fixture
         :param str test_role_arn: IAM role ARN for testing
+        :param str name_suffix: Appended to the function name, so the cases don't share names
+        :param dict module_inputs: Extra module inputs for the case
         """
-        function_name = "test-log-group-destroy"
+        function_name = f"test-log-group-destroy{name_suffix}"
         log_group_name = f"/aws/lambda/{function_name}"
 
         # A group an earlier failed run left behind would make the apply fail.
@@ -292,6 +400,7 @@ class TestLogGroup:
             test_role_arn,
             fixture="lambda_logs_continuously",
             function_timeout=LONG_INVOCATION_TIMEOUT,
+            **module_inputs,
         )
 
         with terraform_apply(
