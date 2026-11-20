@@ -423,6 +423,18 @@ def cloudwatch_client(boto3_session, aws_region):
 
 
 @pytest.fixture
+def logs_client(boto3_session, aws_region):
+    """
+    Create boto3 CloudWatch Logs client from pytest-infrahouse boto3_session.
+
+    :param boto3_session: Boto3 session from pytest-infrahouse
+    :param str aws_region: AWS region for the client
+    :return: Boto3 CloudWatch Logs client
+    """
+    return boto3_session.client("logs", region_name=aws_region)
+
+
+@pytest.fixture
 def sns_client(boto3_session, aws_region):
     """
     Create boto3 SNS client from pytest-infrahouse boto3_session.
