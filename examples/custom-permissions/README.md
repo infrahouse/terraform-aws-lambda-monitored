@@ -50,7 +50,7 @@ This example implements a file processor Lambda function that:
 
 ## Prerequisites
 
-- Terraform ~> 1.0
+- Terraform >= 1.9, < 2.0
 - AWS credentials configured
 - At least one valid email address for alerts
 

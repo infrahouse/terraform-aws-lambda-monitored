@@ -13,7 +13,7 @@ The module's packaging script runs on the machine where `terraform apply` execut
 | `python3` | Build virtualenv, install deps | `brew install python3` / `apt install python3` |
 | `pip3` | Install Python dependencies | `python3 -m ensurepip` |
 | `jq` | Parse AWS CLI JSON output | `brew install jq` / `apt install jq` |
-| `terraform` | `~> 1.0` | <https://developer.hashicorp.com/terraform/install> |
+| `terraform` | `>= 1.9, < 2.0` | <https://developer.hashicorp.com/terraform/install> |
 | `aws` CLI | Used by the S3 upload wait loop | <https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html> |
 
 Linux/macOS only — `infrahouse-core` doesn't support Windows.
@@ -60,7 +60,7 @@ def lambda_handler(event, context):
 
 ```hcl
 terraform {
-  required_version = "~> 1.0"
+  required_version = ">= 1.9, < 2.0"
 
   required_providers {
     aws = {

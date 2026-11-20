@@ -69,7 +69,7 @@ The root module is flat (not split into submodules). Files are grouped by concer
   and with that permission a log write after destroy re-created it outside Terraform (issue #26). The deny is what
   stops it when the memory alarm attaches `CloudWatchLambdaInsightsExecutionRolePolicy` (Allow on `*`).
   **IAM role uses `name_prefix`** (`local.role_name_prefix`): `var.role_name_prefix` verbatim when set (validated as
-  1–38 chars of `[\w+=,.@-]`, null-safe without `||` or `length()` because Terraform 1.0 doesn't short-circuit `||`);
+  1–38 chars of `[\w+=,.@-]`, null-safe without `||` or `length()` because Terraform 1.9 doesn't short-circuit `||`);
   otherwise `function_name` truncated to 37 chars plus `-` to stay under AWS's 38-char limit, full name preserved in
   tags. Keep that null branch byte-for-byte: `name_prefix` forces replacement, so changing it replaces every existing
   caller's role (issue #37). Downstream callers must use `lambda_role_arn`/`lambda_role_name` outputs rather than
