@@ -301,11 +301,6 @@ class TestLogGroup:
                 denied,
             )
 
-            assert not grants_action(actions, "logs:CreateLogGroup"), actions
-            assert grants_action(actions, "logs:CreateLogStream"), actions
-            assert grants_action(actions, "logs:PutLogEvents"), actions
-            assert grants_action(denied, "logs:CreateLogGroup"), denied
-
             group_arn = tf_output["cloudwatch_log_group_arn"]["value"]
             stream_arn = f"{group_arn}:log-stream:simulated"
             expected = {
@@ -319,6 +314,11 @@ class TestLogGroup:
             )
             LOG.info("IAM simulation for %s: %s", role_name, decisions)
             assert decisions == expected
+
+            assert not grants_action(actions, "logs:CreateLogGroup"), actions
+            assert grants_action(actions, "logs:CreateLogStream"), actions
+            assert grants_action(actions, "logs:PutLogEvents"), actions
+            assert grants_action(denied, "logs:CreateLogGroup"), denied
 
             invoke_once(lambda_client, function_name)
 
