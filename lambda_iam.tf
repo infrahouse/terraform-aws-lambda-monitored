@@ -48,6 +48,20 @@ data "aws_iam_policy_document" "lambda_logging" {
     ]
     resources = ["${aws_cloudwatch_log_group.lambda.arn}:*"]
   }
+
+  # Not granting it isn't enough: other policies on the role may allow logs:CreateLogGroup on "*", such as
+  # CloudWatchLambdaInsightsExecutionRolePolicy (attached below with the memory alarm) or AWSLambdaBasicExecutionRole
+  # in additional_iam_policy_arns. An explicit deny wins over any Allow. Both ARN forms, so it matches however the
+  # request names the group. Lambda Insights' own /aws/lambda-insights group is not affected.
+  statement {
+    sid     = "DenyRecreatingTheLogGroup"
+    effect  = "Deny"
+    actions = ["logs:CreateLogGroup"]
+    resources = [
+      aws_cloudwatch_log_group.lambda.arn,
+      "${aws_cloudwatch_log_group.lambda.arn}:*"
+    ]
+  }
 }
 
 # IAM policy for CloudWatch Logs
@@ -152,6 +166,9 @@ resource "aws_iam_role_policy_attachment" "additional" {
 
   role       = aws_iam_role.lambda.name
   policy_arn = var.additional_iam_policy_arns[count.index]
+
+  # Detached before the logging policy is deleted, so its deny on logs:CreateLogGroup outlives any Allow here.
+  depends_on = [aws_iam_role_policy.lambda_logging]
 }
 
 # Grant the Lambda Insights extension permission to publish metrics.
@@ -161,4 +178,8 @@ resource "aws_iam_role_policy_attachment" "lambda_insights" {
 
   role       = aws_iam_role.lambda.name
   policy_arn = "arn:aws:iam::aws:policy/CloudWatchLambdaInsightsExecutionRolePolicy"
+
+  # This policy allows logs:CreateLogGroup on "*". Detached before the logging policy is deleted, so the
+  # logging policy's deny outlives that Allow on destroy.
+  depends_on = [aws_iam_role_policy.lambda_logging]
 }
