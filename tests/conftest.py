@@ -276,6 +276,10 @@ def create_terraform_config(
           value = module.lambda_monitored.cloudwatch_log_group_name
         }
 
+        output "cloudwatch_log_group_arn" {
+          value = module.lambda_monitored.cloudwatch_log_group_arn
+        }
+
         output "sns_topic_arn" {
           value = module.lambda_monitored.sns_topic_arn
         }
