@@ -1,5 +1,10 @@
 .DEFAULT_GOAL := help
 
+# run_pytest pipes pytest into tee, and a pipeline's exit status is that of its last command, tee's.
+# It sets pipefail so a failing pytest run fails the target (issue #40), which needs bash: /bin/sh is
+# dash on Ubuntu. Not via .SHELLFLAGS: GNU make reads it from 3.82 on, and macOS ships 3.81.
+SHELL := /bin/bash
+
 define PRINT_HELP_PYSCRIPT
 import re, sys
 
@@ -18,8 +23,9 @@ KEEP_AFTER ?=
 
 # Function to run pytest with common parameters
 # Args: $(1) = test filter pattern, $(2) = test path, $(3) = force keep-after flag
+# The target fails with pytest's exit status, 5 included: a TEST_SELECTOR that matches nothing fails.
 define run_pytest
-	pytest -xvvs \
+	set -o pipefail; pytest -xvvs \
 		--aws-region=${TEST_REGION} \
 		--test-role-arn=${TEST_ROLE} \
 		$(if $(or $(KEEP_AFTER),$(3)),--keep-after,) \
