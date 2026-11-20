@@ -31,6 +31,12 @@ LOG_GROUP_POLL_SECONDS = 5
 # How long to wait for an invocation's log events to become readable.
 LOG_EVENTS_TIMEOUT_SECONDS = 180
 
+# The destroy test deletes the function while an invocation of lambda_logs_continuously is still
+# running: the invocation is asked to log for this long, well past the time destroy needs to
+# reach the function, and the function's timeout leaves room for it.
+LONG_INVOCATION_SECONDS = 90
+LONG_INVOCATION_TIMEOUT = 120
+
 
 def allowed_actions(policy_document: Dict[str, Any]) -> List[str]:
     """
@@ -106,17 +112,43 @@ def invoke_once(lambda_client: BaseClient, function_name: str) -> None:
     assert "FunctionError" not in response, response
 
 
-def write_simple_lambda_config(
+def wait_for_log_event(
+    logs_client: BaseClient, log_group_name: str, filter_pattern: str = ""
+) -> Dict[str, Any]:
+    """
+    Wait until a log event matching the pattern is readable in the log group.
+
+    :param BaseClient logs_client: Boto3 CloudWatch Logs client
+    :param str log_group_name: Name of the log group
+    :param str filter_pattern: CloudWatch Logs filter pattern; empty matches any event
+    :return: The first matching event as ``filter_log_events`` returns it
+    :rtype: dict
+    :raise TimeoutError: If no such event shows up within ``LOG_EVENTS_TIMEOUT_SECONDS``
+    """
+    with timeout(LOG_EVENTS_TIMEOUT_SECONDS):
+        while True:
+            events = logs_client.filter_log_events(
+                logGroupName=log_group_name, filterPattern=filter_pattern, limit=1
+            )["events"]
+            if events:
+                return events[0]
+            LOG.info("Waiting for log events in %s", log_group_name)
+            time.sleep(5)
+
+
+def write_lambda_config(
     test_module_dir: Path,
     fixtures_dir: Path,
     function_name: str,
     aws_provider_version: str,
     aws_region: str,
     test_role_arn: str,
+    fixture: str = "simple_lambda",
+    function_timeout: int = None,
     log_group_destroy_delay_seconds: float = None,
 ) -> None:
     """
-    Write a root module that deploys the ``simple_lambda`` fixture with the module's defaults.
+    Write a root module that deploys a fixture with the module's defaults.
 
     :param Path test_module_dir: Directory to write the root module to
     :param Path fixtures_dir: Path to Lambda fixtures
@@ -124,17 +156,20 @@ def write_simple_lambda_config(
     :param str aws_provider_version: AWS provider version constraint
     :param str aws_region: AWS region to deploy to
     :param str test_role_arn: IAM role ARN Terraform assumes
+    :param str fixture: Directory under ``fixtures_dir`` with the function's source
+    :param int function_timeout: Function timeout in seconds (optional; module default when None)
     :param float log_group_destroy_delay_seconds: Value for the module input of that name
         (optional; when None the argument is omitted and the module uses its default)
     """
     create_terraform_config(
         test_module_dir,
-        fixtures_dir / "simple_lambda",
+        fixtures_dir / fixture,
         function_name,
         "devnull@infrahouse.com",
         aws_provider_version,
         aws_region=aws_region,
         role_arn=test_role_arn,
+        timeout=function_timeout,
         log_group_destroy_delay_seconds=log_group_destroy_delay_seconds,
     )
 
@@ -173,7 +208,7 @@ class TestLogGroup:
         :param str test_role_arn: IAM role ARN for testing
         """
         function_name = "test-logging-policy"
-        write_simple_lambda_config(
+        write_lambda_config(
             test_module_dir,
             fixtures_dir,
             function_name,
@@ -201,16 +236,8 @@ class TestLogGroup:
             invoke_once(lambda_client, function_name)
 
             log_group_name = tf_output["cloudwatch_log_group_name"]["value"]
-            events = []
-            with timeout(LOG_EVENTS_TIMEOUT_SECONDS):
-                while not events:
-                    events = logs_client.filter_log_events(
-                        logGroupName=log_group_name, limit=1
-                    )["events"]
-                    if not events:
-                        LOG.info("Waiting for log events in %s", log_group_name)
-                        time.sleep(5)
-            LOG.info("First log event in %s: %s", log_group_name, events[0]["message"])
+            event = wait_for_log_event(logs_client, log_group_name)
+            LOG.info("First log event in %s: %s", log_group_name, event["message"])
 
     def test_log_group_stays_deleted_after_destroy(
         self,
@@ -225,14 +252,17 @@ class TestLogGroup:
         """
         Test that ``/aws/lambda/<function_name>`` doesn't come back after ``terraform destroy``.
 
-        Applies the module and invokes the function once, so a warm execution environment exists
-        when the function is deleted. Destroys, then watches the log group name for 60 seconds.
-        If the group reappears, the test deletes it, so the next apply isn't blocked by
-        ``ResourceAlreadyExistsException``, and fails.
+        Starts an invocation of ``lambda_logs_continuously`` that logs for 90 seconds and destroys
+        while it runs. Deleting the function stops the invocation, and Lambda flushes the lines it
+        still holds about half a second later. Without the fix that flush lands after Terraform
+        deleted the group and, through the role's ``logs:CreateLogGroup``, creates it again: the
+        late write the issue saw by chance happens on every run. Then watches the log group name
+        for 60 seconds. If the group reappears, the test deletes it, so the next apply isn't
+        blocked by ``ResourceAlreadyExistsException``, and fails.
 
-        The race is intermittent, so a pass doesn't prove the bug is gone; the test must pass
-        reliably with the fix in place. It destroys even with ``--keep-after``, because the
-        destroy is what it tests.
+        Lambda's teardown timing isn't documented, so a pass doesn't prove no late write can ever
+        recreate the group; the test must pass reliably with the fix in place. It destroys even
+        with ``--keep-after``, because the destroy is what it tests.
 
         :param Path test_module_dir: Temporary test module directory
         :param Path fixtures_dir: Path to Lambda fixtures
@@ -253,13 +283,15 @@ class TestLogGroup:
             )
             logs_client.delete_log_group(logGroupName=log_group_name)
 
-        write_simple_lambda_config(
+        write_lambda_config(
             test_module_dir,
             fixtures_dir,
             function_name,
             aws_provider_version,
             aws_region,
             test_role_arn,
+            fixture="lambda_logs_continuously",
+            function_timeout=LONG_INVOCATION_TIMEOUT,
         )
 
         with terraform_apply(
@@ -268,7 +300,17 @@ class TestLogGroup:
             json_output=True,
         ) as tf_output:
             assert tf_output["cloudwatch_log_group_name"]["value"] == log_group_name
-            invoke_once(lambda_client, function_name)
+
+            response = lambda_client.invoke(
+                FunctionName=function_name,
+                InvocationType="Event",
+                Payload=json.dumps({"seconds": LONG_INVOCATION_SECONDS}),
+            )
+            assert response["StatusCode"] == 202, response
+
+            # Its first line proves the invocation is running; destroy then deletes the function under it.
+            event = wait_for_log_event(logs_client, log_group_name, '"tick"')
+            LOG.info("Invocation is logging (%s), destroying", event["message"].strip())
 
         destroyed_at = datetime.now(timezone.utc)
         LOG.info(
@@ -316,7 +358,7 @@ class TestLogGroup:
         :param str test_role_arn: IAM role ARN for testing
         :param float delay: Value under test
         """
-        write_simple_lambda_config(
+        write_lambda_config(
             test_module_dir,
             fixtures_dir,
             "test-log-group-delay-plan",
@@ -353,7 +395,7 @@ class TestLogGroup:
         :param str test_role_arn: IAM role ARN for testing
         :param float delay: Value under test
         """
-        write_simple_lambda_config(
+        write_lambda_config(
             test_module_dir,
             fixtures_dir,
             "test-log-group-delay-plan",
