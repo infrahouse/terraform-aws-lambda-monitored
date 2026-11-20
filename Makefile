@@ -83,6 +83,10 @@ test-vpc:  ## Run VPC integration tests (use TEST_SELECTOR to filter)
 test-log-group:  ## Run log group lifecycle tests, issue #26 (use TEST_SELECTOR to filter)
 	$(call run_pytest,TestLogGroup,tests/test_log_group.py)
 
+.PHONY: test-terraform-floor
+test-terraform-floor:  ## Validate the module with the oldest Terraform required_version allows, issue #36 (no AWS)
+	$(call run_pytest,TestTerraformFloor,tests/test_terraform_floor.py)
+
 .PHONY: test-x86
 test-x86:  ## Run tests for x86_64 architecture only (use TEST_SELECTOR to filter)
 	$(call run_pytest,x86,tests/)
