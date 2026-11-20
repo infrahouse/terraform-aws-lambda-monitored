@@ -14,11 +14,12 @@ dashed lines are optional or conditional on variable values.
 | `module.lambda_bucket` | `lambda_s3.tf` | 1 | S3 bucket for deployment packages (via `infrahouse/s3-bucket`). |
 | `aws_s3_object.lambda_package` | `lambda_s3.tf` | 1 | Uploaded zip. Key includes a content hash so uploads are immutable. |
 | `aws_iam_role.lambda` | `lambda_iam.tf` | 1 | Execution role, `name_prefix`-ed: `role_name_prefix` if set, else the function name cut to fit 38 chars. |
-| `aws_iam_role_policy.lambda_logging` | `lambda_iam.tf` | 1 | Write logs to the function's log group only. |
+| `aws_iam_role_policy.lambda_logging` | `lambda_iam.tf` | 1 | Create log streams in and write events to the function's log group only. No `logs:CreateLogGroup`. |
 | `aws_iam_role_policy.lambda_vpc_access` | `lambda_iam.tf` | 0 or 1 | ENI lifecycle in specified subnets only, when `lambda_subnet_ids` is set. |
 | `aws_iam_role_policy_attachment.additional` | `lambda_iam.tf` | N | One per ARN in `additional_iam_policy_arns`. |
 | `aws_iam_role_policy_attachment.lambda_insights` | `lambda_iam.tf` | 0 or 1 | Attaches `CloudWatchLambdaInsightsExecutionRolePolicy` when memory alarm is enabled. |
 | `aws_cloudwatch_log_group.lambda` | `cloudwatch.tf` | 1 | `/aws/lambda/${function_name}` with configurable retention. |
+| `time_sleep.log_group_destroy_delay` | `cloudwatch.tf` | 1 | Destroy-time wait between the function and its log group (`log_group_destroy_delay_seconds`). |
 | `aws_sns_topic.alarms` | `sns.tf` | 1 | Fan-out point for all alarms. |
 | `aws_sns_topic_subscription.alarm_emails` | `sns.tf` | N | One per email in `alarm_emails`. |
 | `aws_cloudwatch_metric_alarm.errors_immediate` | `alarms.tf` | 0 or 1 | Fires on any error when `alert_strategy = "immediate"`. |
@@ -92,6 +93,38 @@ PagerDuty topic ARN, all four alarms will fan out to both the email subs and Pag
 Whether an error alarm can fire depends on how often the function runs and how long each run takes. `errors_immediate`
 sizes its window from `timeout`; `errors_threshold` needs `error_rate_period` sized to the invocation pattern. See
 [Monitoring](monitoring.md) for how the alarms are evaluated.
+
+## Log group lifecycle
+
+The module owns `/aws/lambda/${function_name}`: Terraform creates it with the configured retention and KMS key before
+the function, so Lambda never has to create it. The execution role's inline policy accordingly allows only
+`logs:CreateLogStream` and `logs:PutLogEvents` on that group, and not `logs:CreateLogGroup`.
+
+Creation order, from the dependencies:
+
+```
+aws_cloudwatch_log_group.lambda ────┐
+aws_iam_role_policy.lambda_logging ─┴→ time_sleep.log_group_destroy_delay → aws_lambda_function.this
+```
+
+Destroy runs the other way: the function, then the wait, then the log group and the logging policy. The wait is
+`log_group_destroy_delay_seconds` (default 10). During it the group still exists and the role may still write to it.
+Only `destroy_duration` is set on the `time_sleep`, so apply never waits.
+
+Why both ([#26](https://github.com/infrahouse/terraform-aws-lambda-monitored/issues/26)): Lambda can write a
+function's last log lines a few seconds after `DeleteFunction` returns. Before this, Terraform deleted the group about
+a second after the function. A late write then found no group, and with `logs:CreateLogGroup` on the role it created
+one: no retention, unknown to Terraform, and the next apply failed with `ResourceAlreadyExistsException`. Without
+`logs:CreateLogGroup` such a write fails instead; the wait lets it land in the module's group while it still exists.
+
+Notes:
+
+- `time_sleep` comes from the `hashicorp/time` provider (`~> 0.9`). The provider reads the duration from state, so the
+  wait also happens when the module block is removed from the configuration. A destroy-time `local-exec` would not
+  run then.
+- Changing `log_group_destroy_delay_seconds` updates the `time_sleep` in place, without waiting.
+- Changing `function_name` replaces the function and the log group but not the `time_sleep`, so that replacement
+  doesn't wait.
 
 ## IAM role naming
 

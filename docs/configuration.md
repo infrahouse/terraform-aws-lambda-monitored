@@ -58,6 +58,7 @@ subnets — the module refuses to grant broad `ec2:*NetworkInterface*` permissio
 | Variable | Type | Default | Notes |
 |----------|------|---------|-------|
 | `cloudwatch_log_retention_days` | `number` | `365` | Must be a valid CloudWatch retention value (`1`, `3`, `7`, `14`, `30`, `60`, `90`, …, `3653`, or `0` for never expire). |
+| `log_group_destroy_delay_seconds` | `number` | `10` | Seconds `terraform destroy` waits after deleting the function before it deletes the log group, so Lambda's last log lines can't leave an orphan group behind. Whole number, `0` or more; `0` turns the wait off. Apply never waits. See [Architecture](architecture.md#log-group-lifecycle). |
 
 ## Alerting — recipients
 
