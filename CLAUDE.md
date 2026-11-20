@@ -25,6 +25,10 @@ All day-to-day tasks go through the Makefile (`make help` lists targets):
   `test-sns`, `test-vpc`, `test-log-group`)
 - `make test-<suite>` — run one suite (e.g. `make test-simple`); suites map to `Test*` classes in `tests/test_module.py`
   (`TestErrorMonitoring` lives in `tests/test_error_monitoring.py`, `TestLogGroup` in `tests/test_log_group.py`)
+- `make test-terraform-floor` — `TestTerraformFloor` in `tests/test_terraform_floor.py`: downloads the Terraform
+  release named by the `>=` bound of `required_version` in `terraform.tf` and runs `terraform init -backend=false` +
+  `terraform validate` on a copy of the module (issue #36). Needs no AWS; CI runs it after `make lint`, before
+  `make test`. When raising the floor, change only `terraform.tf`: the test reads it from there.
 - `make release-{patch,minor,major}` — bumps version via `.bumpversion.cfg`, edits `CHANGELOG.md`, commits, tags;
   requires being on `main`
 
