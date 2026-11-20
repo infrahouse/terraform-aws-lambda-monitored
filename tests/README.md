@@ -16,7 +16,7 @@ The test suite validates the module across:
 
 2. **Python**: Python 3.9 or higher
 
-3. **Terraform**: Terraform 1.0 or higher
+3. **Terraform**: Terraform 1.9 or higher, below 2.0 (`required_version` in `terraform.tf`)
 
 4. **Test Dependencies**:
    ```bash

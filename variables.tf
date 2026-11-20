@@ -162,7 +162,7 @@ variable "role_name_prefix" {
   default     = null
 
   validation {
-    # Terraform 1.0 evaluates both sides of ||, so null is handled by a conditional instead,
+    # Terraform 1.9 evaluates both sides of ||, so null is handled by a conditional instead,
     # and can() keeps regex() from raising on null however the expression is evaluated.
     condition     = var.role_name_prefix == null ? true : can(regex("^[\\w+=,.@-]{1,38}$", var.role_name_prefix))
     error_message = <<-EOT
