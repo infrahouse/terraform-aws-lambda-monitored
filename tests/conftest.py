@@ -49,6 +49,7 @@ def create_terraform_config(
     timeout: int = None,
     error_rate_period: int = None,
     role_name_prefix: str = None,
+    log_group_destroy_delay_seconds: float = None,
 ):
     """
     Create Terraform configuration files for testing the module.
@@ -74,6 +75,8 @@ def create_terraform_config(
     :param int error_rate_period: Error-rate alarm period in seconds (optional; module default when unset)
     :param str role_name_prefix: IAM role name prefix passed to the module verbatim (optional; when None
         the argument is omitted, so the module sees its default of null)
+    :param float log_group_destroy_delay_seconds: Destroy-time wait before the log group is deleted (optional;
+        when None the argument is omitted, so the module uses its default)
     """
     LOG.info("Creating Terraform root module in %s", module_dir)
 
@@ -215,6 +218,12 @@ def create_terraform_config(
         # json.dumps yields a quoted, escaped string that is also a valid HCL string literal.
         role_name_prefix_config = f"role_name_prefix = {json.dumps(role_name_prefix)}"
 
+    log_group_destroy_delay_config = (
+        ""
+        if log_group_destroy_delay_seconds is None
+        else f"log_group_destroy_delay_seconds = {log_group_destroy_delay_seconds}"
+    )
+
     main_tf = dedent(f"""
         {sg_resource}
         module "lambda_monitored" {{
@@ -227,6 +236,7 @@ def create_terraform_config(
           alert_strategy    = "{alert_strategy}"
           {timeout_config}
           {role_name_prefix_config}
+          {log_group_destroy_delay_config}
 
           alarm_emails = ["{alarm_email}"]
 

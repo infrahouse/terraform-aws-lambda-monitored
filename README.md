@@ -484,6 +484,7 @@ Apache 2.0 — see [LICENSE](LICENSE).
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | ~> 1.0 |
 | <a name="requirement_aws"></a> [aws](#requirement\_aws) | >= 5.31, < 7.0 |
 | <a name="requirement_null"></a> [null](#requirement\_null) | ~> 3.0 |
+| <a name="requirement_time"></a> [time](#requirement\_time) | ~> 0.9 |
 
 ## Providers
 
@@ -491,6 +492,7 @@ Apache 2.0 — see [LICENSE](LICENSE).
 |------|---------|
 | <a name="provider_aws"></a> [aws](#provider\_aws) | >= 5.31, < 7.0 |
 | <a name="provider_null"></a> [null](#provider\_null) | ~> 3.0 |
+| <a name="provider_time"></a> [time](#provider\_time) | ~> 0.9 |
 
 ## Modules
 
@@ -519,6 +521,7 @@ Apache 2.0 — see [LICENSE](LICENSE).
 | [aws_sns_topic.alarms](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/sns_topic) | resource |
 | [aws_sns_topic_subscription.alarm_emails](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/sns_topic_subscription) | resource |
 | [null_resource.lambda_package](https://registry.terraform.io/providers/hashicorp/null/latest/docs/resources/resource) | resource |
+| [time_sleep.log_group_destroy_delay](https://registry.terraform.io/providers/hashicorp/time/latest/docs/resources/sleep) | resource |
 | [aws_caller_identity.current](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/caller_identity) | data source |
 | [aws_iam_policy_document.lambda_assume_role](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_policy_document) | data source |
 | [aws_iam_policy_document.lambda_logging](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_policy_document) | data source |
@@ -551,6 +554,7 @@ Apache 2.0 — see [LICENSE](LICENSE).
 | <a name="input_lambda_security_group_ids"></a> [lambda\_security\_group\_ids](#input\_lambda\_security\_group\_ids) | List of security group IDs for Lambda VPC configuration. Required if lambda\_subnet\_ids is specified. | `list(string)` | `null` | no |
 | <a name="input_lambda_source_dir"></a> [lambda\_source\_dir](#input\_lambda\_source\_dir) | Path to the directory containing Lambda function source code | `string` | n/a | yes |
 | <a name="input_lambda_subnet_ids"></a> [lambda\_subnet\_ids](#input\_lambda\_subnet\_ids) | List of subnet IDs for Lambda VPC configuration. The subnets must have NAT gateway for internet access. If not specified, Lambda will not be attached to a VPC. | `list(string)` | `null` | no |
+| <a name="input_log_group_destroy_delay_seconds"></a> [log\_group\_destroy\_delay\_seconds](#input\_log\_group\_destroy\_delay\_seconds) | Seconds that terraform destroy waits between deleting the Lambda function and deleting its<br/>CloudWatch log group. Lambda can still write the function's last log lines a few seconds after<br/>the function is deleted; the wait lets them land before the group goes, so they can't leave<br/>an orphan log group behind (issue #26). Apply never waits. 0 turns the wait off. | `number` | `10` | no |
 | <a name="input_memory_size"></a> [memory\_size](#input\_memory\_size) | Lambda function memory size in MB | `number` | `128` | no |
 | <a name="input_memory_utilization_threshold_percent"></a> [memory\_utilization\_threshold\_percent](#input\_memory\_utilization\_threshold\_percent) | Percentage of allocated memory that triggers the memory utilization alarm (1-100).<br/>If null (default), the memory alarm is disabled and Lambda Insights is NOT enabled.<br/>When set, the module attaches the AWS-managed Lambda Insights extension layer to the<br/>function, grants the CloudWatchLambdaInsightsExecutionRolePolicy managed policy to the<br/>execution role, and creates a CloudWatch alarm on the LambdaInsights memory\_utilization<br/>metric. Enabling this incurs Lambda Insights charges. | `number` | `null` | no |
 | <a name="input_python_version"></a> [python\_version](#input\_python\_version) | Python runtime version. Must be an Amazon Linux 2023 runtime (python3.12 or<br/>python3.13): this module installs manylinux\_2\_28 wheels (glibc 2.28), which<br/>only AL2023 runtimes can load. Earlier runtimes (Amazon Linux 2, python <=<br/>3.11) are not supported. See<br/>https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html | `string` | `"python3.12"` | no |
