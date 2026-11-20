@@ -34,12 +34,15 @@ resource "aws_iam_role" "lambda" {
   tags = local.tags
 }
 
-# IAM policy document for CloudWatch Logs
+# IAM policy document for CloudWatch Logs.
+# No logs:CreateLogGroup: the module creates the log group before the function (depends_on in lambda.tf),
+# so the role never needs it. With it, a log write that lands after terraform destroy has deleted the group
+# re-creates the group outside Terraform, without retention, and the next apply fails with
+# ResourceAlreadyExistsException (issue #26).
 data "aws_iam_policy_document" "lambda_logging" {
   statement {
     effect = "Allow"
     actions = [
-      "logs:CreateLogGroup",
       "logs:CreateLogStream",
       "logs:PutLogEvents"
     ]
