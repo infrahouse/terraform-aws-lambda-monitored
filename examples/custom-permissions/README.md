@@ -130,13 +130,24 @@ The module automatically creates:
 {
   "Effect": "Allow",
   "Action": [
-    "logs:CreateLogGroup",
     "logs:CreateLogStream",
     "logs:PutLogEvents"
   ],
   "Resource": "arn:aws:logs:*:*:log-group:/aws/lambda/function-name:*"
+},
+{
+  "Effect": "Deny",
+  "Action": "logs:CreateLogGroup",
+  "Resource": [
+    "arn:aws:logs:*:*:log-group:/aws/lambda/function-name",
+    "arn:aws:logs:*:*:log-group:/aws/lambda/function-name:*"
+  ]
 }
 ```
+
+The module creates the log group itself, so the role gets no `logs:CreateLogGroup`. The deny keeps a log line that
+Lambda writes after `terraform destroy` from re-creating the group, even when another policy on the role, such as one
+in `additional_iam_policy_arns`, allows `logs:CreateLogGroup`.
 
 ### Custom Permissions (added in this example)
 

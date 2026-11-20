@@ -59,13 +59,15 @@ The root module is flat (not split into submodules). Files are grouped by concer
   filename embeds `package_hash`.
 - `lambda_iam.tf` — execution role (assume-role policy, logging policy, VPC ENI policy when `lambda_subnet_ids` is
   set, user-supplied `additional_iam_policy_arns`). **The logging policy grants only `CreateLogStream` and
-  `PutLogEvents`, never `logs:CreateLogGroup`**: the module creates the group, and with that permission a log write
-  after destroy re-created it outside Terraform (issue #26). **IAM role uses `name_prefix`** (`local.role_name_prefix`):
-  `var.role_name_prefix` verbatim when set (validated as 1–38 chars of `[\w+=,.@-]`, null-safe without `||` or
-  `length()` because Terraform 1.0 doesn't short-circuit `||`); otherwise `function_name` truncated to 37 chars plus
-  `-` to stay under AWS's 38-char limit, full name preserved in tags. Keep that null branch byte-for-byte:
-  `name_prefix` forces replacement, so changing it replaces every existing caller's role (issue #37). Downstream
-  callers must use `lambda_role_arn`/`lambda_role_name` outputs rather than reconstructing the name.
+  `PutLogEvents`, and explicitly denies `logs:CreateLogGroup` on the module's group**: the module creates the group,
+  and with that permission a log write after destroy re-created it outside Terraform (issue #26). The deny is what
+  stops it when the memory alarm attaches `CloudWatchLambdaInsightsExecutionRolePolicy` (Allow on `*`).
+  **IAM role uses `name_prefix`** (`local.role_name_prefix`): `var.role_name_prefix` verbatim when set (validated as
+  1–38 chars of `[\w+=,.@-]`, null-safe without `||` or `length()` because Terraform 1.0 doesn't short-circuit `||`);
+  otherwise `function_name` truncated to 37 chars plus `-` to stay under AWS's 38-char limit, full name preserved in
+  tags. Keep that null branch byte-for-byte: `name_prefix` forces replacement, so changing it replaces every existing
+  caller's role (issue #37). Downstream callers must use `lambda_role_arn`/`lambda_role_name` outputs rather than
+  reconstructing the name.
 - `alarms.tf` — four CloudWatch alarms: `errors_immediate` (fires on any error) **or** `errors_threshold` (error-rate
   metric-math, `(errors / invocations) * 100`) depending on `alert_strategy`; always-on `throttles`; optional
   `duration` (only when `duration_threshold_percent` is set, computed against `var.timeout`).

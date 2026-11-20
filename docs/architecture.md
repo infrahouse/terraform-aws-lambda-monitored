@@ -14,7 +14,7 @@ dashed lines are optional or conditional on variable values.
 | `module.lambda_bucket` | `lambda_s3.tf` | 1 | S3 bucket for deployment packages (via `infrahouse/s3-bucket`). |
 | `aws_s3_object.lambda_package` | `lambda_s3.tf` | 1 | Uploaded zip. Key includes a content hash so uploads are immutable. |
 | `aws_iam_role.lambda` | `lambda_iam.tf` | 1 | Execution role, `name_prefix`-ed: `role_name_prefix` if set, else the function name cut to fit 38 chars. |
-| `aws_iam_role_policy.lambda_logging` | `lambda_iam.tf` | 1 | Create log streams in and write events to the function's log group only. No `logs:CreateLogGroup`. |
+| `aws_iam_role_policy.lambda_logging` | `lambda_iam.tf` | 1 | Create log streams in and write events to the function's log group only; deny `logs:CreateLogGroup` on it. |
 | `aws_iam_role_policy.lambda_vpc_access` | `lambda_iam.tf` | 0 or 1 | ENI lifecycle in specified subnets only, when `lambda_subnet_ids` is set. |
 | `aws_iam_role_policy_attachment.additional` | `lambda_iam.tf` | N | One per ARN in `additional_iam_policy_arns`. |
 | `aws_iam_role_policy_attachment.lambda_insights` | `lambda_iam.tf` | 0 or 1 | Attaches `CloudWatchLambdaInsightsExecutionRolePolicy` when memory alarm is enabled. |
@@ -98,7 +98,11 @@ sizes its window from `timeout`; `errors_threshold` needs `error_rate_period` si
 
 The module owns `/aws/lambda/${function_name}`: Terraform creates it with the configured retention and KMS key before
 the function, so Lambda never has to create it. The execution role's inline policy accordingly allows only
-`logs:CreateLogStream` and `logs:PutLogEvents` on that group, and not `logs:CreateLogGroup`.
+`logs:CreateLogStream` and `logs:PutLogEvents` on that group, and explicitly denies `logs:CreateLogGroup` on it (both
+the group's ARN and `ARN:*`). An explicit deny wins over any Allow, so it also overrides other policies on the role:
+`CloudWatchLambdaInsightsExecutionRolePolicy`, attached when `memory_utilization_threshold_percent` is set, allows
+`logs:CreateLogGroup` on `*`, and so does `AWSLambdaBasicExecutionRole` if you pass it in
+`additional_iam_policy_arns`. Lambda Insights' own group, `/aws/lambda-insights`, isn't affected.
 
 Creation order, from the dependencies:
 
@@ -114,8 +118,8 @@ Only `destroy_duration` is set on the `time_sleep`, so apply never waits.
 Why both ([#26](https://github.com/infrahouse/terraform-aws-lambda-monitored/issues/26)): Lambda can write a
 function's last log lines a few seconds after `DeleteFunction` returns. Before this, Terraform deleted the group about
 a second after the function. A late write then found no group, and with `logs:CreateLogGroup` on the role it created
-one: no retention, unknown to Terraform, and the next apply failed with `ResourceAlreadyExistsException`. Without
-`logs:CreateLogGroup` such a write fails instead; the wait lets it land in the module's group while it still exists.
+one: no retention, unknown to Terraform, and the next apply failed with `ResourceAlreadyExistsException`. With the
+deny such a write fails instead; the wait lets it land in the module's group while it still exists.
 
 Notes:
 
