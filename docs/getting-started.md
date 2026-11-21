@@ -76,7 +76,7 @@ provider "aws" {
 
 module "lambda" {
   source  = "registry.infrahouse.com/infrahouse/lambda-monitored/aws"
-  version = "2.2.0"
+  version = "2.2.1"
 
   function_name     = "hello-lambda"
   lambda_source_dir = "${path.module}/lambda"
